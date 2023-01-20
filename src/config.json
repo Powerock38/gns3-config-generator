@@ -1,24 +1,54 @@
 {
-  "providers_routers": [
+  "as": 65000,
+  "ip_range": "10.0.0.1-10.0.0.254",
+  "provider_routers": [
     {
       "id": "P1",
+      "links_bgp": ["P2"],
+      "loopback": "",
       "interfaces": [
         {
-          "name": "GigabitEthernet0/0",
+          "id": "GigabitEthernet0/0",
           "ip": "",
-          "links": ["P2"]
+          "links_ospf": ["P2"]
         }
       ]
     },
     {
       "id": "P2",
+      "links_bgp": ["P1"],
       "interfaces": [
         {
-          "name": "GigabitEthernet0/0",
+          "id": "GigabitEthernet0/0",
           "ip": "",
-          "links": ["P1"]
+          "links_ospf": ["P1"]
         }
       ]
+    },
+    {
+      "id": "PE1",
+      "edge": true,
+      "links_bgp": ["P2"],
+      "interfaces": [
+        {
+          "id": "GigabitEthernet0/0",
+          "ip": "",
+          "links_ospf": ["P2"]
+        }
+      ],
+      "vpn_clients": ["Client1"]
+    }
+  ],
+  "client_routers": [
+    {
+      "id": "C1"
+    }
+  ],
+  "vpn_clients": [
+    {
+      "id": "Client1",
+      "router": "C1",
+      "rt_no": 1000
     }
   ]
 }
