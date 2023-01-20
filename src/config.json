@@ -1,0 +1,24 @@
+{
+  "providers_routers": [
+    {
+      "id": "P1",
+      "interfaces": [
+        {
+          "name": "GigabitEthernet0/0",
+          "ip": "",
+          "links": ["P2"]
+        }
+      ]
+    },
+    {
+      "id": "P2",
+      "interfaces": [
+        {
+          "name": "GigabitEthernet0/0",
+          "ip": "",
+          "links": ["P1"]
+        }
+      ]
+    }
+  ]
+}

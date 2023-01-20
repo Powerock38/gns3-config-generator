@@ -1,0 +1,23 @@
+{
+  "name": "gns3-config-generator",
+  "version": "1.0.0",
+  "description": "A simple tool to generate GNS3 config files",
+  "main": "index.js",
+  "scripts": {
+    "start": "npm run build && node build/index.js",
+    "build": "tsc"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Powerock38/gns3-config-generator.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Powerock38/gns3-config-generator/issues"
+  },
+  "homepage": "https://github.com/Powerock38/gns3-config-generator#readme",
+  "devDependencies": {
+    "typescript": "^4.9.4"
+  }
+}
