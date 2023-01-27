@@ -1,54 +1,61 @@
 {
   "as": 65000,
-  "ip_range": "10.0.0.1-10.0.0.254",
+  "p_cidr": "10.0.0.0/16",
+  "c_cidr": "10.12.0.0/16",
+  "lo_cidr": "10.70.0.0/16",
   "provider_routers": [
     {
-      "id": "P1",
-      "links_bgp": ["P2"],
-      "loopback": "",
+      "id": "Pescara",
       "interfaces": [
         {
-          "id": "GigabitEthernet0/0",
-          "ip": "",
-          "links_ospf": ["P2"]
+          "id": "GigabitEthernet2/0",
+          "neighbor": "CEA-1"
+        },
+        {
+          "id": "GigabitEthernet3/0",
+          "neighbor": "CEB-1"
         }
       ]
     },
     {
-      "id": "P2",
-      "links_bgp": ["P1"],
+      "id": "Pesaro",
       "interfaces": [
         {
           "id": "GigabitEthernet0/0",
-          "ip": "",
-          "links_ospf": ["P1"]
+          "neighbor": "P1"
         }
       ]
     },
     {
-      "id": "PE1",
-      "edge": true,
-      "links_bgp": ["P2"],
+      "id": "Pauillac",
       "interfaces": [
         {
           "id": "GigabitEthernet0/0",
-          "ip": "",
-          "links_ospf": ["P2"]
+          "neighbor": ""
         }
-      ],
-      "vpn_clients": ["Client1"]
+      ]
+    },
+    {
+      "id": "Pomerol",
+      "interfaces": [
+        {
+          "id": "GigabitEthernet0/0",
+          "neighbor": ""
+        }
+      ]
     }
   ],
-  "client_routers": [
+  "clients": [
     {
-      "id": "C1"
-    }
-  ],
-  "vpn_clients": [
-    {
-      "id": "Client1",
-      "router": "C1",
-      "rt_no": 1000
+      "id": "ClientA",
+      "as": 65001,
+      "rt_no": 1000,
+      "routers": [
+        {
+          "id": "CEA-1",
+          "interfaceId": "GigabitEthernet0/0"
+        }
+      ]
     }
   ]
 }

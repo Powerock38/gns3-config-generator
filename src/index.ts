@@ -1,105 +1,103 @@
-import CONFIG from "./config.json";
+import CONFIG from "./config.json"
+import { c, getClient, IpMaskGenerator, OUT, rdGenerator } from "./utils"
 
-const OUT: string[] = [];
+const pIpGen = new IpMaskGenerator(CONFIG.p_cidr) // Networks between provider routers
+const loIpGen = new IpMaskGenerator(CONFIG.lo_cidr) // Loopback networks
+const cIpGen = new IpMaskGenerator(CONFIG.c_cidr) // Networks between PE and customer routers
 
-// a function that yields a valid IP address in CONFIG.ip_range
-function* ipGenerator() {
-  const [start, end] = CONFIG.ip_range.split("-");
-  const [start1, start2, start3, start4] = start.split(".");
-  const [end1, end2, end3, end4] = end.split(".");
-  let [cur1, cur2, cur3, cur4] = [start1, start2, start3, start4];
+// todo infer is edge from interfaces neighbors
+// and fetch corresponding client
 
-  while (true) {
-    yield `${cur1}.${cur2}.${cur3}.${cur4}`;
+function conf() {
+  const ips: Record<string, string> = {}
 
-    if (cur4 === end4) {
-      cur4 = "0";
-      if (cur3 === end3) {
-        cur3 = "0";
-        if (cur2 === end2) {
-          cur2 = "0";
-          if (cur1 === end1) {
-            throw new Error("IP range exhausted");
-          } else {
-            cur1 = (parseInt(cur1) + 1).toString();
-          }
-        } else {
-          cur2 = (parseInt(cur2) + 1).toString();
+  for (const pRouter of CONFIG.provider_routers) {
+    // en
+    // conf t
+    c(`!`)
+    c(`hostname ${pRouter.id}`)
+    c(`ip cef`)
+    c(`router ospf 1`)
+
+    c(`interface Loopback0`)
+    c(`ip address ${loIpGen.nextIp()} 255.255.255.255`)
+    // c(`ip ospf network point-to-point`);
+    c(`ip ospf 1 area 0`)
+
+    for (const iface of pRouter.interfaces) {
+      c(`interface ${iface.id}`)
+      const ip = pIpGen.nextIpMask()
+      ips[pRouter.id + iface.id] = ip
+      c(`ip address ${ip}`)
+
+      // c(`ip ospf network point-to-point`);
+      c(`ip ospf 1 area 0`)
+
+      c(`duplex auto`)
+      c(`speed auto`)
+
+      c(`mpls ip`)
+
+      c(`no shutdown`)
+    }
+
+    if (pRouter.edge) {
+      if (pRouter.clients.length > 0) {
+        for (const clientId of pRouter.clients) {
+          const client = getClient(clientId)
+
+          c(`vrf definition ${clientId}`)
+          c(`rd ${CONFIG.as}:${rdGenerator()}`)
+          c(`route-target export ${CONFIG.as}:${client.rt_no}`)
+          c(`route-target import ${CONFIG.as}:${client.rt_no}`)
+          c(`address-family ipv4`)
+          c(`exit-address-family`)
         }
-      } else {
-        cur3 = (parseInt(cur3) + 1).toString();
+
+        c(`interface Loopback0`)
+        c(`ip address ${pIpGen.nextIpMask()}`)
+
+        for (const iface of pRouter.interfaces) {
+          c(`interface ${iface.id}`)
+
+          for (const clientId of pRouter.clients) {
+            c(`vrf forwarding ${clientId}`)
+            c(`ip address ${pIpGen.nextIpMask()}`)
+            c(`duplex auto`)
+            c(`speed auto`)
+            c(`media-type rj45`)
+          }
+        }
       }
-    } else {
-      cur4 = (parseInt(cur4) + 1).toString();
     }
   }
-}
 
-// a function that yields a RD number between 0 - 65535
-function* rdGenerator() {
-  let cur = 0;
-  while (true) {
-    yield cur;
-    cur++;
-    if (cur === 65535) {
-      throw new Error("RD exhausted");
+  for (const client of CONFIG.clients) {
+    for (const ceRouter of client.routers) {
+      c(`!`)
+      c(`hostname ${ceRouter.id}`)
+      c(`ip cef`)
+
+      c(`interface ${ceRouter.interfaceId}`)
+      c(`duplex auto`)
+      c(`speed auto`)
+      c(`media-type rj45`)
+
+      c(`router bgp ${client.as}`)
+      c(`bgp log-neighbor-changes`)
+      c(`redistribute connected`)
+      const pe = CONFIG.provider_routers.find(
+        (r) => r.id === ceRouter.neighbor && r.edge
+      )
+      if (!pe) throw new Error(`Router ${ceRouter.neighbor} not found`)
+      const peIface = pe.interfaces.find((i) => i.neighbor === ceRouter.id)
+      if (!peIface) throw new Error(`Interface not found`)
+      const ip = ips[pe.id + peIface.id]
+      if (!ip) throw new Error(`IP not found`)
+      c(`neighbor ${ip} remote-as ${CONFIG.as}`)
     }
   }
+  console.log(OUT.join("\n"))
 }
 
-function c(cmd: string) {
-  OUT.push(cmd);
-}
-
-function getClient(clientId: string) {
-  const c = CONFIG.vpn_clients.find((c) => c.id === clientId);
-  if (!c) {
-    throw new Error(`Client ${clientId} not found`);
-  }
-  return c;
-}
-
-for (const pRouter of CONFIG.provider_routers) {
-  // en
-  // conf t
-  c(`hostname ${pRouter.id}`);
-  c(`ip cef`);
-  c(`router ospf 1`);
-
-  if (pRouter.loopback) {
-    c(`interface ${pRouter.loopback}`);
-    c(`ip address ${ipGenerator()} ${"TODO mask"}`); // Maybe use a different generator for loopback IPs
-    // c(`ip ospf network point-to-point`);
-    c(`ip ospf 1 area 0`);
-  }
-
-  for (const inf of pRouter.interfaces) {
-    c(`interface ${inf.id}`);
-    c(`ip address ${ipGenerator()} ${"TODO mask"}`);
-
-    // c(`ip ospf network point-to-point`);
-    c(`ip ospf 1 area 0`);
-
-    c(`duplex auto`);
-    c(`speed auto`);
-
-    c(`mpls ip`);
-
-    c(`no shutdown`);
-  }
-
-  if (pRouter.edge && pRouter.vpn_clients.length > 0) {
-    for (const clientId of pRouter.vpn_clients) {
-      const client = getClient(clientId);
-
-      c(`vrf definition ${clientId}`);
-      c(`rd ${CONFIG.as}:${rdGenerator()}`);
-      c(`route-target export ${CONFIG.as}:${client.rt_no}`);
-      c(`route-target import ${CONFIG.as}:${client.rt_no}`);
-      c(`address-family ipv4`);
-      c(`exit-address-family`);
-    }
-  }
-}
-
-console.log(OUT.join("\n"));
+conf()
