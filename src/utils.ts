@@ -71,10 +71,6 @@ export function c(cmd: string) {
   OUT.push(cmd)
 }
 
-export function getClient(clientId: string) {
-  const c = CONFIG.clients.find((c) => c.id === clientId)
-  if (!c) {
-    throw new Error(`Client ${clientId} not found`)
-  }
-  return c
+export function getClientFromRouter(routerId: string) {
+  return CONFIG.clients.find((c) => c.routers.find((r) => r.id === routerId))
 }
