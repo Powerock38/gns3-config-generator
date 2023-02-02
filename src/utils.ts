@@ -65,12 +65,35 @@ export function rdGenerator() {
   return c
 }
 
-export const OUT: string[] = []
+export function openTelnet(host: string) {
+  // TODO
+  console.log(`telnet ${host}`)
+
+  c(`en`)
+  c(`conf t`)
+}
 
 export function c(cmd: string) {
-  OUT.push(cmd)
+  console.log(cmd)
 }
 
 export function getClientFromRouter(routerId: string) {
   return CONFIG.clients.find((c) => c.routers.find((r) => r.id === routerId))
+}
+
+export function binIpToString(ip: number) {
+  return (
+    (ip >>> 24) +
+    "." +
+    ((ip >>> 16) & 0xff) +
+    "." +
+    ((ip >>> 8) & 0xff) +
+    "." +
+    (ip & 0xff)
+  )
+}
+
+export function stringIpToBin(ip: string) {
+  const [a, b, c, d] = ip.split(".").map((i) => parseInt(i))
+  return (a << 24) | (b << 16) | (c << 8) | d
 }

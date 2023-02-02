@@ -1,11 +1,11 @@
 {
   "as": 65000,
-  "p_cidr": "10.0.0.0/16",
-  "c_cidr": "10.12.0.0/16",
-  "lo_cidr": "10.70.0.0/16",
+  "pCidr": "10.0.0.0/16",
+  "loCidr": "10.10.10.10/16",
   "provider_routers": [
     {
       "id": "Pescara",
+      "managementHost": "localhost:5001",
       "interfaces": [
         {
           "id": "GigabitEthernet2/0",
@@ -19,6 +19,7 @@
     },
     {
       "id": "Pesaro",
+      "managementHost": "localhost:5002",
       "interfaces": [
         {
           "id": "GigabitEthernet0/0",
@@ -28,6 +29,7 @@
     },
     {
       "id": "Pauillac",
+      "managementHost": "localhost:5003",
       "interfaces": [
         {
           "id": "GigabitEthernet0/0",
@@ -37,6 +39,7 @@
     },
     {
       "id": "Pomerol",
+      "managementHost": "localhost:5004",
       "interfaces": [
         {
           "id": "GigabitEthernet0/0",
@@ -49,10 +52,11 @@
     {
       "id": "ClientA",
       "as": 65001,
-      "rt_no": 1000,
+      "rtNo": 1000,
       "routers": [
         {
           "id": "CEA-1",
+          "managementHost": "localhost:5005",
           "interfaceId": "GigabitEthernet0/0"
         }
       ]

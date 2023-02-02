@@ -1,154 +1,221 @@
 import CONFIG from "./config.json"
+import { CERouter, Client, Ip, PInterface, PRouter } from "./types"
 import {
+  binIpToString,
   c,
   getClientFromRouter,
   IpMaskGenerator,
-  OUT,
+  openTelnet,
   rdGenerator,
+  stringIpToBin,
 } from "./utils"
 
-const pIpGen = new IpMaskGenerator(CONFIG.p_cidr) // Networks between provider routers
-const loIpGen = new IpMaskGenerator(CONFIG.lo_cidr) // Loopback networks
-const cIpGen = new IpMaskGenerator(CONFIG.c_cidr) // Networks between PE and customer routers
+/* TODO
+maybe replace entirely IpMaskGenerator with binIpToString and stringIpToBin and make those to use masks
+*/
 
-// TODO: ip addresses are bullshit
+const loIpGen = new IpMaskGenerator(CONFIG.loCidr) // Loopback networks
+// let loIP = stringIpToBin(CONFIG.loCidr.split("/")[0])
+let pIP = stringIpToBin(CONFIG.pCidr.split("/")[0])
 
-function conf() {
-  const ips: Record<string, string> = {}
+const CLIENTS: Client[] = []
+const PROUTERS: PRouter[] = []
 
-  for (const pRouter of CONFIG.provider_routers) {
-    // en
-    // conf t
-    c(`!`)
-    c(`hostname ${pRouter.id}`)
-    c(`ip cef`)
-    c(`router ospf 1`)
+// PARSE CONFIG
 
-    {
-      c(`interface Loopback0`)
-      c(`ip address ${loIpGen.nextIp()} 255.255.255.255`)
-      c(`ip ospf 1 area 0`)
-    }
+for (const pRouter of CONFIG.provider_routers) {
+  const interfaces: PInterface[] = []
 
-    for (const iface of pRouter.interfaces) {
-      c(`interface ${iface.id}`)
-      c(`description link to ${iface.neighbor}`)
-
-      const client = getClientFromRouter(iface.neighbor)
-      if (!client) {
-        const ip = pIpGen.nextIpMask()
-        ips[pRouter.id + iface.id] = ip
-        c(`ip address ${ip}`)
-
-        c(`ip ospf 1 area 0`)
-
-        // c(`duplex auto`)
-        // c(`speed auto`)
-        c(`negotiation auto`)
-
-        c(`mpls ip`)
-
-        c(`no shutdown`)
-      } else {
-        // if PE
-        c(`vrf forwarding ${client.id}`)
-        c(`ip address ${pIpGen.nextIpMask()}`)
-      }
-    }
-
-    // if PE
-
-    // clients contains all clients connected to this PE,
-    // with 'routers' field containing only the CE routers connected to this PE
-    const clients = CONFIG.clients.flatMap((client) => {
-      const ceRoutersNeighbors = client.routers.filter((ceRouter) =>
-        pRouter.interfaces.find((iface) => {
-          iface.id === ceRouter.interfaceId
-        })
-      )
-      if (!ceRoutersNeighbors) return []
-      else return [{ ...client, routers: ceRoutersNeighbors }]
-    })
-
-    if (clients) {
-      for (const client of clients) {
-        c(`vrf definition ${client.id}`)
-        c(`rd ${CONFIG.as}:${rdGenerator()}`)
-        c(`route-target export ${CONFIG.as}:${client.rt_no}`)
-        c(`route-target import ${CONFIG.as}:${client.rt_no}`)
-        c(`address-family ipv4`)
-        c(`exit-address-family`)
-      }
-
-      c(`router bgp ${CONFIG.as}`)
-      c(`bgp log-neighbor-changes`)
-
-      const pRoutersNeighborsIds = pRouter.interfaces.filter((iface) => {
-        return !clients
-          .flatMap((client) => client.routers.map((r) => r.id))
-          .includes(iface.neighbor)
-      })
-      for (const pRouterNeighborId of pRoutersNeighborsIds) {
-        const ip = pIpGen.nextIpMask()
-        ips[pRouter.id + pRouterNeighborId] = ip
-        c(`no bgp log-neighbor-changes`)
-        c(`neighbor ${ip} remote-as ${CONFIG.as}`)
-        c(`neighbor ${ip} update-source Loopback0`)
-        c(`address-family vpnv4`)
-        c(`neighbor ${ip} activate`)
-        c(`neighbor ${ip} send-community both`)
-        c(`exit-address-family`)
-      }
-
-      for (const client of clients) {
-        c(`address-family ipv4 vrf ${client.id}`)
-
-        for (const ceRouter of client.routers) {
-          const ip = cIpGen.nextIpMask()
-          ips[pRouter.id + ceRouter.interfaceId] = ip
-          c(`neighbor ${ip} remote-as ${client.as}`)
-          c(`neighbor ${ip} activate`)
+  for (const iface of pRouter.interfaces) {
+    let neighborIface: PInterface | undefined
+    for (const pRouterNeighbor of PROUTERS) {
+      if (iface.neighbor === pRouterNeighbor.id) {
+        for (const ifaceNeighbor of pRouterNeighbor.interfaces) {
+          if (ifaceNeighbor.neighbor === pRouter.id) {
+            neighborIface = ifaceNeighbor
+            break
+          }
         }
-
-        c(`exit-address-family`)
       }
     }
-  }
 
-  for (const client of CONFIG.clients) {
-    for (const ceRouter of client.routers) {
-      c(`!`)
-      c(`hostname ${ceRouter.id}`)
-      c(`ip cef`)
-
-      c(`interface ${ceRouter.interfaceId}`)
-      c(`duplex auto`)
-      c(`speed auto`)
-      c(`media-type rj45`)
-
-      c(`router bgp ${client.as}`)
-      c(`bgp log-neighbor-changes`)
-      c(`redistribute connected`)
-
-      const pe = CONFIG.provider_routers.find((p) =>
-        p.interfaces.find((iface) => iface.neighbor === ceRouter.id)
-      )
-      if (!pe)
-        throw new Error(`Router connected to ${ceRouter.interfaceId} not found`)
-
-      c(`description link to ${pe.id}`)
-
-      const peIface = pe.interfaces.find(
-        (iface) => iface.neighbor === ceRouter.id
-      )
-      if (!peIface) throw new Error(`Interface not found`)
-      const ip = ips[pe.id + peIface.id]
-      if (!ip) throw new Error(`IP not found`)
-
-      c(`neighbor ${ip} remote-as ${CONFIG.as}`)
+    let ip: Ip | undefined
+    if (neighborIface) {
+      ip = binIpToString(stringIpToBin(neighborIface.ip) + 1)
+    } else {
+      ip = binIpToString(pIP) + 1
+      pIP += 4
     }
+
+    interfaces.push({
+      id: iface.id,
+      neighbor: iface.neighbor,
+      ip,
+    })
   }
-  console.log(OUT.join("\n"))
+
+  PROUTERS.push({
+    id: pRouter.id,
+    managementHost: pRouter.managementHost,
+    interfaces,
+    ipLo: loIpGen.nextIp(),
+  })
 }
 
-conf()
+for (const client of CONFIG.clients) {
+  const routers: CERouter[] = []
+
+  for (const ceRouter of client.routers) {
+    let neighborIface: PInterface | undefined
+    for (const pRouterNeighbor of PROUTERS) {
+      for (const ifaceNeighbor of pRouterNeighbor.interfaces) {
+        if (ifaceNeighbor.neighbor === ceRouter.id) {
+          neighborIface = ifaceNeighbor
+          break
+        }
+      }
+    }
+
+    if (!neighborIface) {
+      throw new Error("No PE found for CE " + ceRouter.id)
+    }
+
+    const ip = binIpToString(pIP) + 1
+
+    routers.push({
+      id: ceRouter.id,
+      managementHost: ceRouter.managementHost,
+      interfaceId: ceRouter.interfaceId,
+      interfaceIp: ip,
+    })
+  }
+
+  CLIENTS.push({
+    id: client.id,
+    as: client.as,
+    rtNo: client.rtNo,
+    routers,
+  })
+}
+
+// WRITE GNS3 CONFIG
+
+for (const pRouter of PROUTERS) {
+  openTelnet(pRouter.managementHost)
+
+  c(`hostname ${pRouter.id}`)
+  c(`ip cef`)
+  c(`router ospf 1`)
+
+  // Loopback
+  c(`interface Loopback0`)
+  c(`ip address ${pRouter.ipLo} 255.255.255.255`)
+  c(`ip ospf 1 area 0`)
+
+  // other interfaces
+  for (const iface of pRouter.interfaces) {
+    c(`interface ${iface.id}`)
+    c(`description link to ${iface.neighbor}`)
+
+    // if PE
+    const client = getClientFromRouter(iface.neighbor)
+    if (client) {
+      c(`vrf forwarding ${client.id}`)
+    }
+
+    c(`ip address ${iface.ip} 255.255.255.252`)
+
+    // if regular P router
+    if (!client) {
+      c(`ip ospf 1 area 0`)
+
+      c(`negotiation auto`)
+
+      c(`mpls ip`)
+
+      c(`no shutdown`)
+    }
+  }
+
+  // if PE
+
+  // myClients contains all clients connected to this PE,
+  // with 'routers' field containing only the CE routers connected to this PE
+  const myClients = CLIENTS.flatMap((client) => {
+    const ceRoutersNeighbors = client.routers.filter((ceRouter) =>
+      pRouter.interfaces.find((iface) => {
+        iface.id === ceRouter.interfaceId
+      })
+    )
+    if (!ceRoutersNeighbors) return []
+    else return [{ ...client, routers: ceRoutersNeighbors }]
+  })
+
+  if (myClients) {
+    for (const client of myClients) {
+      c(`vrf definition ${client.id}`)
+      c(`rd ${CONFIG.as}:${rdGenerator()}`) // new RD for each VRF
+      c(`route-target export ${CONFIG.as}:${client.rtNo}`)
+      c(`route-target import ${CONFIG.as}:${client.rtNo}`)
+      c(`address-family ipv4`)
+      c(`exit-address-family`)
+    }
+
+    c(`router bgp ${CONFIG.as}`)
+    c(`bgp log-neighbor-changes`)
+
+    // neighbors are all other PEs
+    const peRouters = PROUTERS.filter((router) => {
+      return router.id !== pRouter.id && !!getClientFromRouter(router.id)
+    })
+    for (const peRouter of peRouters as PRouter[]) {
+      c(`neighbor ${peRouter.ipLo} remote-as ${CONFIG.as}`)
+      c(`neighbor ${peRouter.ipLo} update-source Loopback0`)
+      c(`address-family vpnv4`)
+      c(`neighbor ${peRouter.ipLo} activate`)
+      c(`neighbor ${peRouter.ipLo} send-community both`)
+      c(`exit-address-family`)
+    }
+
+    for (const myClient of myClients) {
+      c(`address-family ipv4 vrf ${myClient.id}`)
+
+      for (const ceRouter of myClient.routers) {
+        c(`neighbor ${ceRouter.interfaceIp} remote-as ${myClient.as}`)
+        c(`neighbor ${ceRouter.interfaceIp} activate`)
+      }
+
+      c(`exit-address-family`)
+    }
+  }
+}
+
+for (const client of CLIENTS) {
+  for (const ceRouter of client.routers) {
+    openTelnet(ceRouter.managementHost)
+
+    c(`hostname ${ceRouter.id}`)
+    c(`ip cef`)
+
+    c(`interface ${ceRouter.interfaceId}`)
+
+    c(`router bgp ${client.as}`)
+    c(`redistribute connected`)
+
+    const pe = PROUTERS.find((p) =>
+      p.interfaces.find((iface) => iface.neighbor === ceRouter.id)
+    )
+    if (!pe) {
+      throw new Error(`Router connected to ${ceRouter.interfaceId} not found`)
+    }
+
+    c(`description link to ${pe.id}`)
+
+    const peIface = pe.interfaces.find(
+      (iface) => iface.neighbor === ceRouter.id
+    )
+    if (!peIface) throw new Error(`Interface not found`)
+
+    c(`neighbor ${peIface.ip} remote-as ${CONFIG.as}`)
+  }
+}
