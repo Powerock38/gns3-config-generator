@@ -1,25 +1,26 @@
+import { IpGen } from "./utils"
+
 export type InterfaceId = string
 export type RouterId = string
-export type Ip = string
 
 export type PInterface = {
   id: InterfaceId
   neighbor: RouterId
-  ip: Ip
+  ip: IpGen
 }
 
 export type PRouter = {
   id: RouterId
   managementHost: string
   interfaces: PInterface[]
-  ipLo: Ip
+  ipLo: IpGen
 }
 
 export type CERouter = {
   id: RouterId
   managementHost: string
   interfaceId: InterfaceId
-  interfaceIp: Ip
+  interfaceIp: IpGen
 }
 
 export type Client = {

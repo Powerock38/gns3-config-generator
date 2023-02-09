@@ -1,22 +1,9 @@
 import CONFIG from "./config.json"
-import { CERouter, Client, Ip, PInterface, PRouter } from "./types"
-import {
-  binIpToString,
-  c,
-  getClientFromRouter,
-  IpMaskGenerator,
-  openTelnet,
-  rdGenerator,
-  stringIpToBin,
-} from "./utils"
+import { CERouter, Client, PInterface, PRouter } from "./types"
+import { c, getClientFromRouter, IpGen, openTelnet, rdGenerator } from "./utils"
 
-/* TODO
-maybe replace entirely IpMaskGenerator with binIpToString and stringIpToBin and make those to use masks
-*/
-
-const loIpGen = new IpMaskGenerator(CONFIG.loCidr) // Loopback networks
-// let loIP = stringIpToBin(CONFIG.loCidr.split("/")[0])
-let pIP = stringIpToBin(CONFIG.pCidr.split("/")[0])
+const loIP = IpGen.fromCidr(CONFIG.loCidr)
+const pIP = IpGen.fromCidr(CONFIG.pCidr)
 
 const CLIENTS: Client[] = []
 const PROUTERS: PRouter[] = []
@@ -39,12 +26,12 @@ for (const pRouter of CONFIG.provider_routers) {
       }
     }
 
-    let ip: Ip | undefined
+    let ip: IpGen
     if (neighborIface) {
-      ip = binIpToString(stringIpToBin(neighborIface.ip) + 1)
+      ip = neighborIface.ip.getNext()
     } else {
-      ip = binIpToString(pIP) + 1
-      pIP += 4
+      ip = pIP.getNext()
+      pIP.incrementSelf(4)
     }
 
     interfaces.push({
@@ -58,8 +45,10 @@ for (const pRouter of CONFIG.provider_routers) {
     id: pRouter.id,
     managementHost: pRouter.managementHost,
     interfaces,
-    ipLo: loIpGen.nextIp(),
+    ipLo: loIP.getNext(),
   })
+
+  loIP.incrementSelf(1)
 }
 
 for (const client of CONFIG.clients) {
@@ -80,13 +69,11 @@ for (const client of CONFIG.clients) {
       throw new Error("No PE found for CE " + ceRouter.id)
     }
 
-    const ip = binIpToString(pIP) + 1
-
     routers.push({
       id: ceRouter.id,
       managementHost: ceRouter.managementHost,
       interfaceId: ceRouter.interfaceId,
-      interfaceIp: ip,
+      interfaceIp: neighborIface.ip.getNext(),
     })
   }
 
