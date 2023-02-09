@@ -1,3 +1,4 @@
+import { Telnet } from "telnet-client"
 import CONFIG from "./config.json"
 
 let currentRd = 0
@@ -10,16 +11,32 @@ export function rdGenerator() {
   return c
 }
 
-export function openTelnet(host: string) {
-  // TODO
-  console.log(`telnet ${host}`)
+let currentTelnet: Telnet | undefined
+export async function openTelnet(host: string) {
+  const [ip, port] = host.split(":")
 
-  c(`en`)
-  c(`conf t`)
+  currentTelnet = new Telnet()
+  await currentTelnet.connect({
+    host: ip,
+    port: parseInt(port),
+    shellPrompt: "/ # ",
+    timeout: 1500,
+  })
+
+  console.log("CONNECTED TO " + host)
+
+  await c(`en`)
+  await c(`conf t`)
 }
 
-export function c(cmd: string) {
+export async function c(cmd: string) {
   console.log(cmd)
+  if (!currentTelnet) {
+    throw new Error("Telnet not connected")
+  }
+
+  const res = await currentTelnet.exec(cmd)
+  console.log("res>", res)
 }
 
 export function getClientFromRouter(routerId: string) {

@@ -5,7 +5,7 @@
   "provider_routers": [
     {
       "id": "Pescara",
-      "managementHost": "localhost:5001",
+      "managementHost": "localhost:5002",
       "interfaces": [
         {
           "id": "GigabitEthernet2/0",
@@ -14,36 +14,60 @@
         {
           "id": "GigabitEthernet3/0",
           "neighbor": "CEB-1"
-        }
-      ]
-    },
-    {
-      "id": "Pesaro",
-      "managementHost": "localhost:5002",
-      "interfaces": [
+        },
         {
-          "id": "GigabitEthernet0/0",
-          "neighbor": "P1"
+          "id": "GigabitEthernet1/0",
+          "neighbor": "Pauillac"
         }
       ]
     },
     {
       "id": "Pauillac",
-      "managementHost": "localhost:5003",
+      "managementHost": "localhost:5000",
       "interfaces": [
         {
-          "id": "GigabitEthernet0/0",
-          "neighbor": ""
+          "id": "GigabitEthernet2/0",
+          "neighbor": "Pescara"
+        },
+        {
+          "id": "GigabitEthernet1/0",
+          "neighbor": "Pomerol"
         }
       ]
     },
     {
       "id": "Pomerol",
-      "managementHost": "localhost:5004",
+      "managementHost": "localhost:5001",
       "interfaces": [
         {
-          "id": "GigabitEthernet0/0",
-          "neighbor": ""
+          "id": "GigabitEthernet1/0",
+          "neighbor": "Pauillac"
+        },
+        {
+          "id": "GigabitEthernet2/0",
+          "neighbor": "Pesaro"
+        }
+      ]
+    },
+    {
+      "id": "Pesaro",
+      "managementHost": "localhost:5003",
+      "interfaces": [
+        {
+          "id": "GigabitEthernet1/0",
+          "neighbor": "Pomerol"
+        },
+        {
+          "id": "GigabitEthernet2/0",
+          "neighbor": "CEA-2"
+        },
+        {
+          "id": "GigabitEthernet3/0",
+          "neighbor": "CEB-2"
+        },
+        {
+          "id": "GigabitEthernet4/0",
+          "neighbor": "CEA-3"
         }
       ]
     }
@@ -52,12 +76,39 @@
     {
       "id": "ClientA",
       "as": 65001,
-      "rtNo": 1000,
+      "rtNo": 110,
       "routers": [
         {
           "id": "CEA-1",
+          "managementHost": "localhost:5004",
+          "interfaceId": "GigabitEthernet1/0"
+        },
+        {
+          "id": "CEA-2",
           "managementHost": "localhost:5005",
-          "interfaceId": "GigabitEthernet0/0"
+          "interfaceId": "GigabitEthernet1/0"
+        },
+        {
+          "id": "CEA-3",
+          "managementHost": "localhost:5008",
+          "interfaceId": "GigabitEthernet1/0"
+        }
+      ]
+    },
+    {
+      "id": "ClientB",
+      "as": 65002,
+      "rtNo": 120,
+      "routers": [
+        {
+          "id": "CEB-1",
+          "managementHost": "localhost:5006",
+          "interfaceId": "GigabitEthernet3/0"
+        },
+        {
+          "id": "CEB-2",
+          "managementHost": "localhost:5007",
+          "interfaceId": "GigabitEthernet3/0"
         }
       ]
     }
