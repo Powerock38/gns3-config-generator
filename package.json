@@ -18,9 +18,10 @@
   },
   "homepage": "https://github.com/Powerock38/gns3-config-generator#readme",
   "devDependencies": {
+    "@types/node": "^18.13.0",
     "typescript": "^4.9.4"
   },
   "dependencies": {
-    "telnet-client": "^2.0.7"
+    "telnet-stream": "^1.1.0"
   }
 }

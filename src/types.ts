@@ -1,4 +1,4 @@
-import { IpGen } from "./utils"
+import { IpGen } from "./IpGen"
 
 export type InterfaceId = string
 export type RouterId = string
@@ -21,11 +21,11 @@ export type CERouter = {
   managementHost: string
   interfaceId: InterfaceId
   interfaceIp: IpGen
+  as: number
 }
 
 export type Client = {
   id: string
-  as: number
   rtNo: number
   routers: CERouter[]
 }

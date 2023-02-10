@@ -75,21 +75,23 @@
   "clients": [
     {
       "id": "ClientA",
-      "as": 65001,
       "rtNo": 110,
       "routers": [
         {
           "id": "CEA-1",
+          "as": 65002,
           "managementHost": "localhost:5004",
           "interfaceId": "GigabitEthernet1/0"
         },
         {
           "id": "CEA-2",
+          "as": 65004,
           "managementHost": "localhost:5005",
           "interfaceId": "GigabitEthernet1/0"
         },
         {
           "id": "CEA-3",
+          "as": 65004,
           "managementHost": "localhost:5008",
           "interfaceId": "GigabitEthernet1/0"
         }
@@ -97,16 +99,17 @@
     },
     {
       "id": "ClientB",
-      "as": 65002,
       "rtNo": 120,
       "routers": [
         {
           "id": "CEB-1",
+          "as": 65001,
           "managementHost": "localhost:5006",
           "interfaceId": "GigabitEthernet3/0"
         },
         {
           "id": "CEB-2",
+          "as": 65003,
           "managementHost": "localhost:5007",
           "interfaceId": "GigabitEthernet3/0"
         }

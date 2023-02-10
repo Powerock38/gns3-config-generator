@@ -1,6 +1,9 @@
+import { exit } from "process"
 import CONFIG from "./config.json"
+import { IpGen } from "./IpGen"
+import { c, openTelnet } from "./telnet"
 import { CERouter, Client, PInterface, PRouter } from "./types"
-import { c, getClientFromRouter, IpGen, openTelnet, rdGenerator } from "./utils"
+import { getClientFromRouter, rdGenerator } from "./utils"
 
 const loIP = IpGen.fromCidr(CONFIG.loCidr)
 const pIP = IpGen.fromCidr(CONFIG.pCidr)
@@ -9,6 +12,8 @@ const CLIENTS: Client[] = []
 const PROUTERS: PRouter[] = []
 
 // PARSE CONFIG
+
+console.log("PARSING CONFIG")
 
 for (const pRouter of CONFIG.provider_routers) {
   const interfaces: PInterface[] = []
@@ -71,6 +76,7 @@ for (const client of CONFIG.clients) {
 
     routers.push({
       id: ceRouter.id,
+      as: ceRouter.as,
       managementHost: ceRouter.managementHost,
       interfaceId: ceRouter.interfaceId,
       interfaceIp: neighborIface.ip.getNext(),
@@ -79,19 +85,18 @@ for (const client of CONFIG.clients) {
 
   CLIENTS.push({
     id: client.id,
-    as: client.as,
     rtNo: client.rtNo,
     routers,
   })
 }
 
-// WRITE GNS3 CONFIG
+// WRITE ROUTERS CONFIG
 
 async function configure() {
+  console.log("CONFIGURING ROUTERS")
+
   for (const pRouter of PROUTERS) {
     await openTelnet(pRouter.managementHost)
-
-    await c(`write erase`)
 
     await c(`hostname ${pRouter.id}`)
     await c(`ip cef`)
@@ -154,9 +159,9 @@ async function configure() {
       await c(`router bgp ${CONFIG.as}`)
       await c(`bgp log-neighbor-changes`)
 
-      // neighbors are all other PEs
+      // bgp neighbors are all other PEs
       const peRouters = PROUTERS.filter((router) => {
-        return router.id !== pRouter.id && !!getClientFromRouter(router.id)
+        return router.id !== pRouter.id && getClientFromRouter(router.id)
       })
       for (const peRouter of peRouters as PRouter[]) {
         await c(`neighbor ${peRouter.ipLo} remote-as ${CONFIG.as}`)
@@ -171,7 +176,7 @@ async function configure() {
         await c(`address-family ipv4 vrf ${myClient.id}`)
 
         for (const ceRouter of myClient.routers) {
-          await c(`neighbor ${ceRouter.interfaceIp} remote-as ${myClient.as}`)
+          await c(`neighbor ${ceRouter.interfaceIp} remote-as ${ceRouter.as}`)
           await c(`neighbor ${ceRouter.interfaceIp} activate`)
         }
 
@@ -182,15 +187,10 @@ async function configure() {
 
   for (const client of CLIENTS) {
     for (const ceRouter of client.routers) {
-      openTelnet(ceRouter.managementHost)
+      await openTelnet(ceRouter.managementHost)
 
       await c(`hostname ${ceRouter.id}`)
       await c(`ip cef`)
-
-      await c(`interface ${ceRouter.interfaceId}`)
-
-      await c(`router bgp ${client.as}`)
-      await c(`redistribute connected`)
 
       const pe = PROUTERS.find((p) =>
         p.interfaces.find((iface) => iface.neighbor === ceRouter.id)
@@ -199,7 +199,12 @@ async function configure() {
         throw new Error(`Router connected to ${ceRouter.interfaceId} not found`)
       }
 
+      await c(`interface ${ceRouter.interfaceId}`)
       await c(`description link to ${pe.id}`)
+      await c(`no shutdown`)
+
+      await c(`router bgp ${ceRouter.as}`)
+      await c(`redistribute connected`)
 
       const peIface = pe.interfaces.find(
         (iface) => iface.neighbor === ceRouter.id
@@ -213,4 +218,5 @@ async function configure() {
 
 configure().then(() => {
   console.log("Done")
+  exit()
 })
