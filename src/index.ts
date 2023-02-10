@@ -11,6 +11,11 @@ const pIP = IpGen.fromCidr(CONFIG.pCidr)
 const CLIENTS: Client[] = []
 const PROUTERS: PRouter[] = []
 
+/* TODO
+- revoir les ip des deux interfaces de chaque lien PE <-> CE (revoir ligne `ip address` dans les CE)
+- est-ce que CEA-2 et CEA-3 sont sensés pouvoir se ping entre eux à travers notre PE ?
+*/
+
 // PARSE CONFIG
 
 console.log("PARSING CONFIG")
@@ -201,6 +206,7 @@ async function configure() {
 
       await c(`interface ${ceRouter.interfaceId}`)
       await c(`description link to ${pe.id}`)
+      await c(`ip address ${ceRouter.interfaceIp} 255.255.255.0`)
       await c(`no shutdown`)
 
       await c(`router bgp ${ceRouter.as}`)
