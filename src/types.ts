@@ -14,6 +14,7 @@ export type PRouter = {
   managementHost: string
   interfaces: PInterface[]
   ipLo: IpGen
+  isPE: boolean
 }
 
 export type CERouter = {

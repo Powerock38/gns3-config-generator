@@ -3,7 +3,7 @@ import CONFIG from "./config.json"
 import { IpGen } from "./IpGen"
 import { c, openTelnet } from "./telnet"
 import { CERouter, Client, PInterface, PRouter } from "./types"
-import { getClientFromRouter, rdGenerator } from "./utils"
+import { getClientFromCEid, rdGenerator } from "./utils"
 
 const loIP = IpGen.fromCidr(CONFIG.loCidr)
 const pIP = IpGen.fromCidr(CONFIG.pCidr)
@@ -56,6 +56,7 @@ for (const pRouter of CONFIG.provider_routers) {
     managementHost: pRouter.managementHost,
     interfaces,
     ipLo: loIP.getNext(),
+    isPE: false, // correctly set in next loop
   })
 
   loIP.incrementSelf(1)
@@ -70,6 +71,7 @@ for (const client of CONFIG.clients) {
       for (const ifaceNeighbor of pRouterNeighbor.interfaces) {
         if (ifaceNeighbor.neighbor === ceRouter.id) {
           neighborIface = ifaceNeighbor
+          pRouterNeighbor.isPE = true
           break
         }
       }
@@ -112,34 +114,7 @@ async function configure() {
     await c(`ip address ${pRouter.ipLo} 255.255.255.255`)
     await c(`ip ospf 1 area 0`)
 
-    // other interfaces
-    for (const iface of pRouter.interfaces) {
-      await c(`interface ${iface.id}`)
-      await c(`description link to ${iface.neighbor}`)
-
-      // if PE
-      const client = getClientFromRouter(iface.neighbor)
-      if (client) {
-        await c(`vrf forwarding ${client.id}`)
-      }
-
-      await c(`ip address ${iface.ip} 255.255.255.252`)
-
-      // if regular P router
-      if (!client) {
-        await c(`ip ospf 1 area 0`)
-
-        await c(`negotiation auto`)
-
-        await c(`mpls ip`)
-
-        await c(`no shutdown`)
-      }
-    }
-
-    // if PE
-
-    // myClients contains all clients connected to this PE,
+    // if PE, myClients contains all clients connected to this PE,
     // with 'routers' field containing only the CE routers connected to this PE
     const myClients = CLIENTS.flatMap((client) => {
       const ceRoutersNeighbors = client.routers.filter((ceRouter) =>
@@ -151,23 +126,44 @@ async function configure() {
       else return [{ ...client, routers: ceRoutersNeighbors }]
     })
 
-    if (myClients) {
-      for (const client of myClients) {
-        await c(`vrf definition ${client.id}`)
-        await c(`rd ${CONFIG.as}:${rdGenerator()}`) // new RD for each VRF
-        await c(`route-target export ${CONFIG.as}:${client.rtNo}`)
-        await c(`route-target import ${CONFIG.as}:${client.rtNo}`)
-        await c(`address-family ipv4`)
-        await c(`exit-address-family`)
+    for (const myClient of myClients) {
+      await c(`vrf definition ${myClient.id}`)
+      await c(`rd ${CONFIG.as}:${rdGenerator()}`) // new RD for each VRF
+      await c(`route-target export ${CONFIG.as}:${myClient.rtNo}`)
+      await c(`route-target import ${CONFIG.as}:${myClient.rtNo}`)
+      await c(`address-family ipv4`)
+      await c(`exit-address-family`)
+    }
+
+    // regular interfaces
+    for (const iface of pRouter.interfaces) {
+      await c(`interface ${iface.id}`)
+      await c(`description link to ${iface.neighbor}`)
+
+      // if PE
+      const myClient = getClientFromCEid(iface.neighbor)
+      if (myClient) {
+        await c(`vrf forwarding ${myClient.id}`)
+      } else {
+        // if regular P router
+        await c(`ip ospf 1 area 0`)
+        await c(`negotiation auto`)
+        await c(`mpls ip`)
       }
 
+      await c(`ip address ${iface.ip} 255.255.255.252`)
+      await c(`no shutdown`)
+    }
+
+    // if PE
+    if (myClients) {
       await c(`router bgp ${CONFIG.as}`)
       await c(`bgp log-neighbor-changes`)
 
       // bgp neighbors are all other PEs
-      const peRouters = PROUTERS.filter((router) => {
-        return router.id !== pRouter.id && getClientFromRouter(router.id)
-      })
+      const peRouters = PROUTERS.filter(
+        (otherRouter) => otherRouter.isPE && otherRouter.id !== pRouter.id
+      )
       for (const peRouter of peRouters as PRouter[]) {
         await c(`neighbor ${peRouter.ipLo} remote-as ${CONFIG.as}`)
         await c(`neighbor ${peRouter.ipLo} update-source Loopback0`)
@@ -206,7 +202,7 @@ async function configure() {
 
       await c(`interface ${ceRouter.interfaceId}`)
       await c(`description link to ${pe.id}`)
-      await c(`ip address ${ceRouter.interfaceIp} 255.255.255.0`)
+      await c(`ip address ${ceRouter.interfaceIp} 255.255.255.252`)
       await c(`no shutdown`)
 
       await c(`router bgp ${ceRouter.as}`)

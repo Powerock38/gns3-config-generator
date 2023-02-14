@@ -10,6 +10,8 @@ export function rdGenerator() {
   return c
 }
 
-export function getClientFromRouter(routerId: string) {
-  return CONFIG.clients.find((c) => c.routers.find((r) => r.id === routerId))
+export function getClientFromCEid(ceId: string) {
+  return CONFIG.clients.find((client) =>
+    client.routers.find((ce) => ce.id === ceId)
+  )
 }
