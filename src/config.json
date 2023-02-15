@@ -1,11 +1,11 @@
 {
-  "as": 65000,
-  "pCidr": "10.0.0.0/16",
-  "loCidr": "10.10.10.10/16",
-  "provider_routers": [
+  "ASN": 65000,
+  "pCIDR": "10.0.0.0/16",
+  "loCIDR": "10.10.10.10/16",
+  "providerRouters": [
     {
       "id": "Pescara",
-      "managementHost": "localhost:5002",
+      "telnetHost": "localhost:5002",
       "interfaces": [
         {
           "id": "GigabitEthernet2/0",
@@ -23,7 +23,7 @@
     },
     {
       "id": "Pauillac",
-      "managementHost": "localhost:5000",
+      "telnetHost": "localhost:5000",
       "interfaces": [
         {
           "id": "GigabitEthernet2/0",
@@ -37,7 +37,7 @@
     },
     {
       "id": "Pomerol",
-      "managementHost": "localhost:5001",
+      "telnetHost": "localhost:5001",
       "interfaces": [
         {
           "id": "GigabitEthernet1/0",
@@ -51,7 +51,7 @@
     },
     {
       "id": "Pesaro",
-      "managementHost": "localhost:5003",
+      "telnetHost": "localhost:5003",
       "interfaces": [
         {
           "id": "GigabitEthernet1/0",
@@ -79,20 +79,20 @@
       "routers": [
         {
           "id": "CEA-1",
-          "as": 65002,
-          "managementHost": "localhost:5004",
+          "ASN": 65002,
+          "telnetHost": "localhost:5004",
           "interfaceId": "GigabitEthernet1/0"
         },
         {
           "id": "CEA-2",
-          "as": 65004,
-          "managementHost": "localhost:5005",
+          "ASN": 65004,
+          "telnetHost": "localhost:5005",
           "interfaceId": "GigabitEthernet1/0"
         },
         {
           "id": "CEA-3",
-          "as": 65004,
-          "managementHost": "localhost:5008",
+          "ASN": 65004,
+          "telnetHost": "localhost:5008",
           "interfaceId": "GigabitEthernet1/0"
         }
       ]
@@ -103,14 +103,14 @@
       "routers": [
         {
           "id": "CEB-1",
-          "as": 65001,
-          "managementHost": "localhost:5006",
+          "ASN": 65001,
+          "telnetHost": "localhost:5006",
           "interfaceId": "GigabitEthernet3/0"
         },
         {
           "id": "CEB-2",
-          "as": 65003,
-          "managementHost": "localhost:5007",
+          "ASN": 65003,
+          "telnetHost": "localhost:5007",
           "interfaceId": "GigabitEthernet3/0"
         }
       ]

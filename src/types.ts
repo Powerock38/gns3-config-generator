@@ -11,7 +11,7 @@ export type PInterface = {
 
 export type PRouter = {
   id: RouterId
-  managementHost: string
+  telnetHost: string
   interfaces: PInterface[]
   ipLo: IpGen
   isPE: boolean
@@ -19,10 +19,10 @@ export type PRouter = {
 
 export type CERouter = {
   id: RouterId
-  managementHost: string
+  telnetHost: string
   interfaceId: InterfaceId
   interfaceIp: IpGen
-  as: number
+  ASN: number
 }
 
 export type Client = {

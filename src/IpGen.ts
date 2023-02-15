@@ -1,5 +1,5 @@
 export class IpGen {
-  static fromCidr(cidr: string) {
+  static fromCIDR(cidr: string) {
     const [ipStr, maskSizeStr] = cidr.split("/")
 
     const maskSize = parseInt(maskSizeStr)
@@ -25,9 +25,9 @@ export class IpGen {
 
   private constructor(private ip: number, private mask: number) {}
 
-  toStringWithMask() {
-    return `${this} ${IpGen.binToString(this.mask)}`
-  }
+  // toStringWithMask() {
+  //   return `${this} ${IpGen.binToString(this.mask)}`
+  // }
 
   toString() {
     return IpGen.binToString(this.ip)
