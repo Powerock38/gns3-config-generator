@@ -12,7 +12,6 @@ const CLIENTS: Client[] = []
 const PROUTERS: PRouter[] = []
 
 /* TODO
-- revoir les ip des deux interfaces de chaque lien PE <-> CE (revoir ligne `ip address` dans les CE)
 - est-ce que CEA-2 et CEA-3 sont sensés pouvoir se ping entre eux à travers notre PE ?
 */
 
@@ -116,15 +115,21 @@ async function configure() {
 
     // if PE, myClients contains all clients connected to this PE,
     // with 'routers' field containing only the CE routers connected to this PE
-    const myClients = CLIENTS.flatMap((client) => {
-      const ceRoutersNeighbors = client.routers.filter((ceRouter) =>
-        pRouter.interfaces.find((iface) => {
-          iface.id === ceRouter.interfaceId
-        })
-      )
-      if (!ceRoutersNeighbors) return []
-      else return [{ ...client, routers: ceRoutersNeighbors }]
-    })
+    const myClients = []
+    for (const client of CLIENTS) {
+      const ceRoutersNeighbors = []
+      for (const ceRouter of client.routers) {
+        for (const iface of pRouter.interfaces) {
+          if (iface.neighbor === ceRouter.id) {
+            ceRoutersNeighbors.push(ceRouter)
+          }
+        }
+      }
+
+      if (ceRoutersNeighbors.length) {
+        myClients.push({ ...client, routers: ceRoutersNeighbors })
+      }
+    }
 
     for (const myClient of myClients) {
       await c(`vrf definition ${myClient.id}`)
@@ -219,6 +224,6 @@ async function configure() {
 }
 
 configure().then(() => {
-  console.log("Done")
+  console.log("\nDONE")
   exit()
 })
