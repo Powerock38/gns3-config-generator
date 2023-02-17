@@ -15,88 +15,86 @@ const PROUTERS: PRouter[] = []
 - est-ce que CEA-2 et CEA-3 sont censés pouvoir se ping entre eux à travers notre PE ?
 */
 
-// PARSE CONFIG
+function parseConfig() {
+  console.log("PARSING CONFIG")
 
-console.log("PARSING CONFIG")
+  for (const pRouter of CONFIG.providerRouters) {
+    const interfaces: PInterface[] = []
 
-for (const pRouter of CONFIG.providerRouters) {
-  const interfaces: PInterface[] = []
+    for (const iface of pRouter.interfaces) {
+      let neighborIface: PInterface | undefined
+      for (const pRouterNeighbor of PROUTERS) {
+        if (iface.neighbor === pRouterNeighbor.id) {
+          for (const ifaceNeighbor of pRouterNeighbor.interfaces) {
+            if (ifaceNeighbor.neighbor === pRouter.id) {
+              neighborIface = ifaceNeighbor
+              break
+            }
+          }
+        }
+      }
 
-  for (const iface of pRouter.interfaces) {
-    let neighborIface: PInterface | undefined
-    for (const pRouterNeighbor of PROUTERS) {
-      if (iface.neighbor === pRouterNeighbor.id) {
+      let ip: IpGen
+      if (neighborIface) {
+        ip = neighborIface.ip.getNext()
+      } else {
+        ip = pIP.getNext()
+        pIP.incrementSelf(4)
+      }
+
+      interfaces.push({
+        id: iface.id,
+        neighbor: iface.neighbor,
+        ip,
+      })
+    }
+
+    PROUTERS.push({
+      id: pRouter.id,
+      telnetHost: pRouter.telnetHost,
+      interfaces,
+      ipLo: loIP.getNext(),
+      isPE: false, // correctly set in next loop
+    })
+
+    loIP.incrementSelf(1)
+  }
+
+  for (const client of CONFIG.clients) {
+    const routers: CERouter[] = []
+
+    for (const ceRouter of client.routers) {
+      let neighborIface: PInterface | undefined
+      for (const pRouterNeighbor of PROUTERS) {
         for (const ifaceNeighbor of pRouterNeighbor.interfaces) {
-          if (ifaceNeighbor.neighbor === pRouter.id) {
+          if (ifaceNeighbor.neighbor === ceRouter.id) {
             neighborIface = ifaceNeighbor
+            pRouterNeighbor.isPE = true
             break
           }
         }
       }
-    }
 
-    let ip: IpGen
-    if (neighborIface) {
-      ip = neighborIface.ip.getNext()
-    } else {
-      ip = pIP.getNext()
-      pIP.incrementSelf(4)
-    }
-
-    interfaces.push({
-      id: iface.id,
-      neighbor: iface.neighbor,
-      ip,
-    })
-  }
-
-  PROUTERS.push({
-    id: pRouter.id,
-    telnetHost: pRouter.telnetHost,
-    interfaces,
-    ipLo: loIP.getNext(),
-    isPE: false, // correctly set in next loop
-  })
-
-  loIP.incrementSelf(1)
-}
-
-for (const client of CONFIG.clients) {
-  const routers: CERouter[] = []
-
-  for (const ceRouter of client.routers) {
-    let neighborIface: PInterface | undefined
-    for (const pRouterNeighbor of PROUTERS) {
-      for (const ifaceNeighbor of pRouterNeighbor.interfaces) {
-        if (ifaceNeighbor.neighbor === ceRouter.id) {
-          neighborIface = ifaceNeighbor
-          pRouterNeighbor.isPE = true
-          break
-        }
+      if (!neighborIface) {
+        throw new Error("No PE found for CE " + ceRouter.id)
       }
+
+      routers.push({
+        id: ceRouter.id,
+        ASN: ceRouter.ASN,
+        telnetHost: ceRouter.telnetHost,
+        interfaceId: ceRouter.interfaceId,
+        interfaceIp: neighborIface.ip.getNext(),
+      })
     }
 
-    if (!neighborIface) {
-      throw new Error("No PE found for CE " + ceRouter.id)
-    }
-
-    routers.push({
-      id: ceRouter.id,
-      ASN: ceRouter.ASN,
-      telnetHost: ceRouter.telnetHost,
-      interfaceId: ceRouter.interfaceId,
-      interfaceIp: neighborIface.ip.getNext(),
+    CLIENTS.push({
+      id: client.id,
+      rtNo: client.rtNo,
+      routers,
     })
   }
-
-  CLIENTS.push({
-    id: client.id,
-    rtNo: client.rtNo,
-    routers,
-  })
 }
-
-// WRITE ROUTERS CONFIG
 
 async function configure() {
   console.log("CONFIGURING ROUTERS")
@@ -223,6 +221,7 @@ async function configure() {
   }
 }
 
+parseConfig()
 configure().then(() => {
   console.log("\nDONE")
   exit()
