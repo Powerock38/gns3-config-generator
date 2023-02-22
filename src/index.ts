@@ -5,15 +5,13 @@ import { c, openTelnet } from "./telnet"
 import { CERouter, Client, PInterface, PRouter } from "./types"
 import { getClientFromCEid, rdGenerator } from "./utils"
 
+const DRY_RUN = false
+
 const loIP = IpGen.fromCIDR(CONFIG.loCIDR)
 const pIP = IpGen.fromCIDR(CONFIG.pCIDR)
 
 const CLIENTS: Client[] = []
 const PROUTERS: PRouter[] = []
-
-/* TODO
-- est-ce que CEA-2 et CEA-3 sont censés pouvoir se ping entre eux à travers notre PE ?
-*/
 
 function parseConfig() {
   console.log("PARSING CONFIG")
@@ -96,6 +94,28 @@ function parseConfig() {
   }
 }
 
+function printConfig() {
+  for (const pRouter of PROUTERS) {
+    console.log({
+      ...pRouter,
+      ipLo: pRouter.ipLo.toString(),
+      interfaces: pRouter.interfaces.map((iface) => ({
+        ...iface,
+        ip: iface.ip.toString(),
+      })),
+    })
+  }
+  for (const client of CLIENTS) {
+    console.log({
+      ...client,
+      routers: client.routers.map((router) => ({
+        ...router,
+        interfaceIp: router.interfaceIp.toString(),
+      })),
+    })
+  }
+}
+
 async function configure() {
   console.log("CONFIGURING ROUTERS")
 
@@ -123,19 +143,20 @@ async function configure() {
           }
         }
       }
-
       if (ceRoutersNeighbors.length) {
         myClients.push({ ...client, routers: ceRoutersNeighbors })
       }
     }
 
     for (const myClient of myClients) {
-      await c(`vrf definition ${myClient.id}`)
-      await c(`rd ${CONFIG.ASN}:${rdGenerator()}`) // new RD for each VRF
-      await c(`route-target export ${CONFIG.ASN}:${myClient.rtNo}`)
-      await c(`route-target import ${CONFIG.ASN}:${myClient.rtNo}`)
-      await c(`address-family ipv4`)
-      await c(`exit-address-family`)
+      for (const ceRouter of myClient.routers) {
+        await c(`vrf definition ${myClient.id}-${ceRouter.id}`)
+        await c(`rd ${CONFIG.ASN}:${rdGenerator()}`) // new RD for each VRF
+        await c(`route-target export ${CONFIG.ASN}:${myClient.rtNo}`)
+        await c(`route-target import ${CONFIG.ASN}:${myClient.rtNo}`)
+        await c(`address-family ipv4`)
+        await c(`exit-address-family`)
+      }
     }
 
     // regular interfaces
@@ -146,7 +167,7 @@ async function configure() {
       // if PE
       const myClient = getClientFromCEid(iface.neighbor)
       if (myClient) {
-        await c(`vrf forwarding ${myClient.id}`)
+        await c(`vrf forwarding ${myClient.id}-${iface.neighbor}`)
       } else {
         // if regular P router
         await c(`ip ospf 1 area 0`)
@@ -177,14 +198,12 @@ async function configure() {
       }
 
       for (const myClient of myClients) {
-        await c(`address-family ipv4 vrf ${myClient.id}`)
-
         for (const ceRouter of myClient.routers) {
+          await c(`address-family ipv4 vrf ${myClient.id}-${ceRouter.id}`)
           await c(`neighbor ${ceRouter.interfaceIp} remote-as ${ceRouter.ASN}`)
           await c(`neighbor ${ceRouter.interfaceIp} activate`)
+          await c(`exit-address-family`)
         }
-
-        await c(`exit-address-family`)
       }
     }
   }
@@ -217,12 +236,16 @@ async function configure() {
       if (!peIface) throw new Error(`Interface not found`)
 
       await c(`neighbor ${peIface.ip} remote-as ${CONFIG.ASN}`)
+      await c(`neighbor ${peIface.ip} allowas-in`)
     }
   }
 }
 
 parseConfig()
-configure().then(() => {
-  console.log("\nDONE")
-  exit()
-})
+printConfig()
+if (!DRY_RUN) {
+  configure().then(() => {
+    console.log("\nDONE")
+    exit()
+  })
+}
