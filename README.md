@@ -59,19 +59,19 @@ This project auto-configures the routers used in a MPLS VPN network.
 - set the hostname, enable OSPF
 - configure the loopback interface
 - if PE:
-  - vrf definition for each client
+  - vrf definition for each CE
 - for each interface:
   - configure the interface IP address
   - if PE-CE link:
-    - vrf forwarding for the client
+    - vrf forwarding for the CE
   - else:
     - enable OSPF (area 0)
     - enable MPLS
 - if PE
   - enable BGP, add every other PE as neighbor
   - for each client:
-    - address-family ipv4 vrf
     - for each CE connected to the PE:
+      - address-family ipv4 vrf
       - configure the CE as neighbor
 
 ### For each client router:

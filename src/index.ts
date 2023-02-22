@@ -180,7 +180,7 @@ async function configure() {
     }
 
     // if PE
-    if (myClients) {
+    if (pRouter.isPE) {
       await c(`router bgp ${CONFIG.ASN}`)
       await c(`bgp log-neighbor-changes`)
 
