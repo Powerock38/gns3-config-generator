@@ -1,8 +1,8 @@
 {
-  "ASN": 65000,
+  "asn": 65000,
   "pCIDR": "10.0.0.0/16",
   "loCIDR": "10.10.10.10/16",
-  "providerRouters": [
+  "pRouters": [
     {
       "id": "Pescara",
       "telnetHost": "localhost:5002",
@@ -75,23 +75,23 @@
   "clients": [
     {
       "id": "ClientA",
-      "rtNo": 110,
+      "friends": [],
       "routers": [
         {
           "id": "CEA-1",
-          "ASN": 65002,
+          "asn": 65002,
           "telnetHost": "localhost:5004",
           "interfaceId": "GigabitEthernet1/0"
         },
         {
           "id": "CEA-2",
-          "ASN": 65004,
+          "asn": 65004,
           "telnetHost": "localhost:5005",
           "interfaceId": "GigabitEthernet1/0"
         },
         {
           "id": "CEA-3",
-          "ASN": 65004,
+          "asn": 65004,
           "telnetHost": "localhost:5008",
           "interfaceId": "GigabitEthernet1/0"
         }
@@ -99,18 +99,54 @@
     },
     {
       "id": "ClientB",
-      "rtNo": 120,
+      "friends": [],
       "routers": [
         {
           "id": "CEB-1",
-          "ASN": 65001,
+          "asn": 65001,
           "telnetHost": "localhost:5006",
           "interfaceId": "GigabitEthernet3/0"
         },
         {
           "id": "CEB-2",
-          "ASN": 65003,
+          "asn": 65003,
           "telnetHost": "localhost:5007",
+          "interfaceId": "GigabitEthernet3/0"
+        }
+      ]
+    },
+    {
+      "id": "BanqueQG",
+      "friends": ["BanqueAgence1", "BanqueAgence2"],
+      "routers": [
+        {
+          "id": "CE-BanqueQG",
+          "asn": 65010,
+          "telnetHost": "localhost:5006",
+          "interfaceId": "GigabitEthernet3/0"
+        }
+      ]
+    },
+    {
+      "id": "BanqueAgence1",
+      "friends": ["BanqueQG"],
+      "routers": [
+        {
+          "id": "CE-BanqueAgence1",
+          "asn": 65011,
+          "telnetHost": "localhost:5006",
+          "interfaceId": "GigabitEthernet3/0"
+        }
+      ]
+    },
+    {
+      "id": "BanqueAgence2",
+      "friends": ["BanqueQG"],
+      "routers": [
+        {
+          "id": "CE-BanqueAgence2",
+          "asn": 65012,
+          "telnetHost": "localhost:5006",
           "interfaceId": "GigabitEthernet3/0"
         }
       ]

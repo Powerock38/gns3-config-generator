@@ -2,6 +2,7 @@ import { IpGen } from "./IpGen"
 
 export type InterfaceId = string
 export type RouterId = string
+export type ClientId = string
 
 export type PInterface = {
   id: InterfaceId
@@ -22,11 +23,53 @@ export type CERouter = {
   telnetHost: string
   interfaceId: InterfaceId
   interfaceIp: IpGen
-  ASN: number
+  asn: number
+  rd: number
 }
 
 export type Client = {
-  id: string
-  rtNo: number
+  id: ClientId
+  rtGroup: number
+  friendsRtGroup: number[]
   routers: CERouter[]
+}
+
+export type Config = {
+  asn: number
+  pRouters: PRouter[]
+  clients: Client[]
+}
+
+// JSON types
+
+export type ConfigJson = {
+  asn: number
+  pCIDR: string
+  loCIDR: string
+  pRouters: PRouterJson[]
+  clients: ClientJson[]
+}
+
+export type PInterfaceJson = {
+  id: InterfaceId
+  neighbor: RouterId
+}
+
+export type PRouterJson = {
+  id: RouterId
+  telnetHost: string
+  interfaces: PInterfaceJson[]
+}
+
+export type CERouterJson = {
+  id: RouterId
+  asn: number
+  telnetHost: string
+  interfaceId: InterfaceId
+}
+
+export type ClientJson = {
+  id: ClientId
+  friends: ClientId[]
+  routers: CERouterJson[]
 }

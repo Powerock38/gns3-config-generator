@@ -1,27 +1,36 @@
-import { exit } from "process"
-import CONFIG from "./config.json"
+#!/usr/bin/env node
+
+import { Command } from "commander"
+import fs from "fs"
+import path from "path"
+import { configure, configureCE } from "./configure"
 import { IpGen } from "./IpGen"
 import { c, openTelnet } from "./telnet"
-import { CERouter, Client, PInterface, PRouter } from "./types"
-import { getClientFromCEid, rdGenerator } from "./utils"
+import {
+  CERouter,
+  CERouterJson,
+  Client,
+  Config,
+  ConfigJson,
+  PInterface,
+  PInterfaceJson,
+  PRouter,
+  PRouterJson,
+} from "./types"
 
-const DRY_RUN = false
+function userConfigIntoGeneratedConfig(configJson: any): Config {
+  const clients: Client[] = []
+  const pRouters: PRouter[] = []
 
-const loIP = IpGen.fromCIDR(CONFIG.loCIDR)
-const pIP = IpGen.fromCIDR(CONFIG.pCIDR)
+  const loIP = IpGen.fromCIDR(configJson.loCIDR)
+  const pIP = IpGen.fromCIDR(configJson.pCIDR)
 
-const CLIENTS: Client[] = []
-const PROUTERS: PRouter[] = []
-
-function parseConfig() {
-  console.log("PARSING CONFIG")
-
-  for (const pRouter of CONFIG.providerRouters) {
+  for (const pRouter of configJson.pRouters) {
     const interfaces: PInterface[] = []
 
     for (const iface of pRouter.interfaces) {
       let neighborIface: PInterface | undefined
-      for (const pRouterNeighbor of PROUTERS) {
+      for (const pRouterNeighbor of pRouters) {
         if (iface.neighbor === pRouterNeighbor.id) {
           for (const ifaceNeighbor of pRouterNeighbor.interfaces) {
             if (ifaceNeighbor.neighbor === pRouter.id) {
@@ -34,9 +43,9 @@ function parseConfig() {
 
       let ip: IpGen
       if (neighborIface) {
-        ip = neighborIface.ip.getNext()
+        ip = neighborIface.ip.getNext(30)
       } else {
-        ip = pIP.getNext()
+        ip = pIP.getNext(30)
         pIP.incrementSelf(4)
       }
 
@@ -47,23 +56,29 @@ function parseConfig() {
       })
     }
 
-    PROUTERS.push({
+    pRouters.push({
       id: pRouter.id,
       telnetHost: pRouter.telnetHost,
       interfaces,
-      ipLo: loIP.getNext(),
+      ipLo: loIP.getNext(32),
       isPE: false, // correctly set in next loop
     })
 
     loIP.incrementSelf(1)
   }
 
-  for (const client of CONFIG.clients) {
+  // index in array = rtGroup
+  const clientsId: string[] = configJson.clients.map((c: any) => c.id)
+
+  // each CE router has a unique RD
+  let rd = 0
+
+  for (const client of configJson.clients) {
     const routers: CERouter[] = []
 
     for (const ceRouter of client.routers) {
       let neighborIface: PInterface | undefined
-      for (const pRouterNeighbor of PROUTERS) {
+      for (const pRouterNeighbor of pRouters) {
         for (const ifaceNeighbor of pRouterNeighbor.interfaces) {
           if (ifaceNeighbor.neighbor === ceRouter.id) {
             neighborIface = ifaceNeighbor
@@ -79,173 +94,191 @@ function parseConfig() {
 
       routers.push({
         id: ceRouter.id,
-        ASN: ceRouter.ASN,
+        asn: ceRouter.asn,
         telnetHost: ceRouter.telnetHost,
         interfaceId: ceRouter.interfaceId,
-        interfaceIp: neighborIface.ip.getNext(),
+        interfaceIp: neighborIface.ip.getNext(30),
+        rd: rd++,
       })
+
+      if (rd > 65535) {
+        throw new Error("RD exhausted")
+      }
     }
 
-    CLIENTS.push({
+    clients.push({
       id: client.id,
-      rtNo: client.rtNo,
+      rtGroup: clientsId.indexOf(client.id),
+      friendsRtGroup: client.friends.map((clientId: string) =>
+        clientsId.indexOf(clientId)
+      ),
       routers,
     })
   }
+
+  return { asn: configJson.asn, pRouters, clients }
 }
 
-function printConfig() {
-  for (const pRouter of PROUTERS) {
-    console.log({
-      ...pRouter,
-      ipLo: pRouter.ipLo.toString(),
-      interfaces: pRouter.interfaces.map((iface) => ({
-        ...iface,
-        ip: iface.ip.toString(),
-      })),
-    })
-  }
-  for (const client of CLIENTS) {
-    console.log({
-      ...client,
-      routers: client.routers.map((router) => ({
-        ...router,
-        interfaceIp: router.interfaceIp.toString(),
-      })),
-    })
-  }
-}
+async function detectNewCEsAndConfigure(
+  configJson: ConfigJson,
+  configGenerated: Config
+) {
+  const lastClient = configGenerated.clients[configGenerated.clients.length - 1]
+  const lastClientLastRouter = lastClient.routers[lastClient.routers.length - 1]
+  const highestRd = lastClientLastRouter.rd
+  const highestIpGen = lastClientLastRouter.interfaceIp
+  highestIpGen.incrementSelf(4)
 
-async function configure() {
-  console.log("CONFIGURING ROUTERS")
+  // detect added CE in config that are not in configGenerated
+  const newCEs: {
+    client: Client
+    pe: PRouter
+    peIfaceJson: PInterfaceJson
+    ceJson: CERouterJson
+  }[] = []
+  for (const clientJson of configJson.clients) {
+    const clientGenerated = configGenerated.clients.find(
+      (c) => c.id === clientJson.id
+    )
+    if (!clientGenerated) {
+      throw new Error("New client detected: not supported yet")
+    } else {
+      for (const ceJson of clientJson.routers) {
+        const ceGenerated = clientGenerated.routers.find(
+          (c) => c.id === ceJson.id
+        )
+        if (!ceGenerated) {
+          console.log(`New CE ${ceJson.id} detected`)
 
-  for (const pRouter of PROUTERS) {
-    await openTelnet(pRouter.telnetHost)
-
-    await c(`hostname ${pRouter.id}`)
-    await c(`ip cef`)
-    await c(`router ospf 1`)
-
-    // Loopback
-    await c(`interface Loopback0`)
-    await c(`ip address ${pRouter.ipLo} 255.255.255.255`)
-    await c(`ip ospf 1 area 0`)
-
-    // if PE, myClients contains all clients connected to this PE,
-    // with 'routers' field containing only the CE routers connected to this PE
-    const myClients = []
-    for (const client of CLIENTS) {
-      const ceRoutersNeighbors = []
-      for (const ceRouter of client.routers) {
-        for (const iface of pRouter.interfaces) {
-          if (iface.neighbor === ceRouter.id) {
-            ceRoutersNeighbors.push(ceRouter)
+          // find corresponding PE and interface in configGenerated
+          let peJson: PRouterJson | undefined
+          let peIfaceJson: PInterfaceJson | undefined
+          for (const pRouterJson of configJson.pRouters) {
+            for (const iface of pRouterJson.interfaces) {
+              if (iface.neighbor === ceJson.id) {
+                peJson = pRouterJson
+                peIfaceJson = iface
+                break
+              }
+            }
           }
-        }
-      }
-      if (ceRoutersNeighbors.length) {
-        myClients.push({ ...client, routers: ceRoutersNeighbors })
-      }
-    }
+          if (!peJson || !peIfaceJson) {
+            throw new Error("No PE found for CE " + ceJson.id)
+          }
 
-    for (const myClient of myClients) {
-      for (const ceRouter of myClient.routers) {
-        await c(`vrf definition ${myClient.id}-${ceRouter.id}`)
-        await c(`rd ${CONFIG.ASN}:${rdGenerator()}`) // new RD for each VRF
-        await c(`route-target export ${CONFIG.ASN}:${myClient.rtNo}`)
-        await c(`route-target import ${CONFIG.ASN}:${myClient.rtNo}`)
-        await c(`address-family ipv4`)
-        await c(`exit-address-family`)
-      }
-    }
+          // to be sure that the PE and the Client was in configGenerated
+          const pe = configGenerated.pRouters.find((p) => p.id === peJson!.id)
+          const client = configGenerated.clients.find(
+            (c) => c.id === clientJson.id
+          )
 
-    // regular interfaces
-    for (const iface of pRouter.interfaces) {
-      await c(`interface ${iface.id}`)
-      await c(`description link to ${iface.neighbor}`)
+          if (!pe || !client) {
+            throw new Error("PE or Client not found in configGenerated")
+          }
 
-      // if PE
-      const myClient = getClientFromCEid(iface.neighbor)
-      if (myClient) {
-        await c(`vrf forwarding ${myClient.id}-${iface.neighbor}`)
-      } else {
-        // if regular P router
-        await c(`ip ospf 1 area 0`)
-        await c(`negotiation auto`)
-        await c(`mpls ip`)
-      }
-
-      await c(`ip address ${iface.ip} 255.255.255.252`)
-      await c(`no shutdown`)
-    }
-
-    // if PE
-    if (pRouter.isPE) {
-      await c(`router bgp ${CONFIG.ASN}`)
-      await c(`bgp log-neighbor-changes`)
-
-      // bgp neighbors are all other PEs
-      const peRouters = PROUTERS.filter(
-        (otherRouter) => otherRouter.isPE && otherRouter.id !== pRouter.id
-      )
-      for (const peRouter of peRouters as PRouter[]) {
-        await c(`neighbor ${peRouter.ipLo} remote-as ${CONFIG.ASN}`)
-        await c(`neighbor ${peRouter.ipLo} update-source Loopback0`)
-        await c(`address-family vpnv4`)
-        await c(`neighbor ${peRouter.ipLo} activate`)
-        await c(`neighbor ${peRouter.ipLo} send-community both`)
-        await c(`exit-address-family`)
-      }
-
-      for (const myClient of myClients) {
-        for (const ceRouter of myClient.routers) {
-          await c(`address-family ipv4 vrf ${myClient.id}-${ceRouter.id}`)
-          await c(`neighbor ${ceRouter.interfaceIp} remote-as ${ceRouter.ASN}`)
-          await c(`neighbor ${ceRouter.interfaceIp} activate`)
-          await c(`exit-address-family`)
+          newCEs.push({ client, pe, peIfaceJson, ceJson })
         }
       }
     }
   }
 
-  for (const client of CLIENTS) {
-    for (const ceRouter of client.routers) {
-      await openTelnet(ceRouter.telnetHost)
-
-      await c(`hostname ${ceRouter.id}`)
-      await c(`ip cef`)
-
-      const pe = PROUTERS.find((p) =>
-        p.interfaces.find((iface) => iface.neighbor === ceRouter.id)
-      )
-      if (!pe) {
-        throw new Error(`Router connected to ${ceRouter.interfaceId} not found`)
-      }
-
-      await c(`interface ${ceRouter.interfaceId}`)
-      await c(`description link to ${pe.id}`)
-      await c(`ip address ${ceRouter.interfaceIp} 255.255.255.252`)
-      await c(`no shutdown`)
-
-      await c(`router bgp ${ceRouter.ASN}`)
-      await c(`redistribute connected`)
-
-      const peIface = pe.interfaces.find(
-        (iface) => iface.neighbor === ceRouter.id
-      )
-      if (!peIface) throw new Error(`Interface not found`)
-
-      await c(`neighbor ${peIface.ip} remote-as ${CONFIG.ASN}`)
-      await c(`neighbor ${peIface.ip} allowas-in`)
+  for (const { client, pe, peIfaceJson, ceJson } of newCEs) {
+    const peIface: PInterface = {
+      id: peIfaceJson.id,
+      neighbor: peIfaceJson.neighbor,
+      ip: highestIpGen.getNext(30),
     }
+
+    const ce: CERouter = {
+      id: ceJson.id,
+      asn: ceJson.asn,
+      interfaceId: ceJson.interfaceId,
+      telnetHost: ceJson.telnetHost,
+      rd: highestRd + 1,
+      interfaceIp: highestIpGen.getNext(30),
+    }
+
+    // update configGenerated
+    pe.interfaces.push(peIface)
+    client.routers.push(ce)
+
+    console.log(`IP on PE will be ${peIface.ip.toStringWithMask()}`)
+    console.log(`IP on CE will be ${ce.interfaceIp.toStringWithMask()}`)
+
+    await openTelnet(pe.telnetHost)
+
+    await c(`vrf definition ${ce.id}`)
+    await c(`rd ${configJson.asn}:${ce.rd}`)
+    await c(`route-target export ${configJson.asn}:${client.rtGroup}`)
+    await c(`route-target import ${configJson.asn}:${client.rtGroup}`)
+    for (const rtGroup of client.friendsRtGroup) {
+      await c(`route-target import ${configJson.asn}:${rtGroup}`)
+    }
+    await c(`address-family ipv4`)
+    await c(`exit-address-family`)
+
+    await c(`interface ${peIface.id}`)
+    await c(`description link to ${peIface.neighbor}`)
+    await c(`vrf forwarding ${peIface.neighbor}`)
+    await c(`ip address ${peIface.ip.toStringWithMask()}`)
+    await c(`no shutdown`)
+
+    await c(`router bgp ${configJson.asn}`)
+    await c(`address-family ipv4 vrf ${ce.id}`)
+    await c(`neighbor ${ce.interfaceIp} remote-as ${ce.asn}`)
+    await c(`neighbor ${ce.interfaceIp} activate`)
+    await c(`exit-address-family`)
+
+    await configureCE(ce, pe.id, peIface.ip, configJson.asn)
   }
 }
 
-parseConfig()
-printConfig()
-if (!DRY_RUN) {
-  configure().then(() => {
+console.log("             _                        _       ")
+console.log("  __ _ _   _| |_ ___  _ __ ___  _   _| |_ ___ ")
+console.log(" / _` | | | | __/ _ \\| '__/ _ \\| | | | __/ _ \\")
+console.log("| (_| | |_| | || (_) | | | (_) | |_| | ||  __/")
+console.log(" \\__,_|\\__,_|\\__\\___/|_|  \\___/ \\__,_|\\__\\___|\n")
+
+const program = new Command()
+
+program
+  .name("autoroute")
+  .version("1.0.0")
+  .description("Auto-configure a whole MPLS VPN network from a config file")
+  .argument("<config-path>", "Path to your hand-written config file")
+  .action(async (configPath) => {
+    const configPathResolved = path.parse(path.resolve(configPath))
+    const genConfigPath = path.resolve(
+      configPathResolved.dir,
+      configPathResolved.name + ".generated.json"
+    )
+
+    const configJson = JSON.parse(
+      fs.readFileSync(configPath, "utf8")
+    ) as ConfigJson
+
+    let configGeneratedJson = undefined
+    try {
+      configGeneratedJson = JSON.parse(fs.readFileSync(genConfigPath, "utf8"))
+      IpGen.deserializeInObject(configGeneratedJson)
+      console.log("Generated config found")
+    } catch (e) {
+      // no generated config found
+    }
+
+    if (configGeneratedJson) {
+      const configGenerated = configGeneratedJson as Config
+      await detectNewCEsAndConfigure(configJson, configGenerated)
+      fs.writeFileSync(genConfigPath, JSON.stringify(configGenerated))
+      console.log(`Re-wrote generated config in : ${genConfigPath}`)
+    } else {
+      const config = userConfigIntoGeneratedConfig(configJson)
+      await configure(config)
+      fs.writeFileSync(genConfigPath, JSON.stringify(config))
+      console.log(`Wrote generated config in : ${genConfigPath}`)
+    }
+
     console.log("\nDONE")
-    exit()
+    process.exit()
   })
-}
+  .parse(process.argv)

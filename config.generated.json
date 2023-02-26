@@ -1,0 +1,201 @@
+{
+  "asn": 65000,
+  "pRouters": [
+    {
+      "id": "Pescara",
+      "telnetHost": "localhost:5002",
+      "interfaces": [
+        {
+          "id": "GigabitEthernet2/0",
+          "neighbor": "CEA-1",
+          "ip": {
+            "ip": 167772161,
+            "mask": -4
+          }
+        },
+        {
+          "id": "GigabitEthernet3/0",
+          "neighbor": "CEB-1",
+          "ip": {
+            "ip": 167772165,
+            "mask": -4
+          }
+        },
+        {
+          "id": "GigabitEthernet1/0",
+          "neighbor": "Pauillac",
+          "ip": {
+            "ip": 167772169,
+            "mask": -4
+          }
+        }
+      ],
+      "ipLo": {
+        "ip": 168430091,
+        "mask": -1
+      },
+      "isPE": true
+    },
+    {
+      "id": "Pauillac",
+      "telnetHost": "localhost:5000",
+      "interfaces": [
+        {
+          "id": "GigabitEthernet2/0",
+          "neighbor": "Pescara",
+          "ip": {
+            "ip": 167772170,
+            "mask": -4
+          }
+        },
+        {
+          "id": "GigabitEthernet1/0",
+          "neighbor": "Pomerol",
+          "ip": {
+            "ip": 167772173,
+            "mask": -4
+          }
+        }
+      ],
+      "ipLo": {
+        "ip": 168430092,
+        "mask": -1
+      },
+      "isPE": false
+    },
+    {
+      "id": "Pomerol",
+      "telnetHost": "localhost:5001",
+      "interfaces": [
+        {
+          "id": "GigabitEthernet1/0",
+          "neighbor": "Pauillac",
+          "ip": {
+            "ip": 167772174,
+            "mask": -4
+          }
+        },
+        {
+          "id": "GigabitEthernet2/0",
+          "neighbor": "Pesaro",
+          "ip": {
+            "ip": 167772177,
+            "mask": -4
+          }
+        }
+      ],
+      "ipLo": {
+        "ip": 168430093,
+        "mask": -1
+      },
+      "isPE": false
+    },
+    {
+      "id": "Pesaro",
+      "telnetHost": "localhost:5003",
+      "interfaces": [
+        {
+          "id": "GigabitEthernet1/0",
+          "neighbor": "Pomerol",
+          "ip": {
+            "ip": 167772178,
+            "mask": -4
+          }
+        },
+        {
+          "id": "GigabitEthernet2/0",
+          "neighbor": "CEA-2",
+          "ip": {
+            "ip": 167772181,
+            "mask": -4
+          }
+        },
+        {
+          "id": "GigabitEthernet3/0",
+          "neighbor": "CEB-2",
+          "ip": {
+            "ip": 167772185,
+            "mask": -4
+          }
+        },
+        {
+          "id": "GigabitEthernet4/0",
+          "neighbor": "CEA-3",
+          "ip": {
+            "ip": 167772189,
+            "mask": -4
+          }
+        }
+      ],
+      "ipLo": {
+        "ip": 168430094,
+        "mask": -1
+      },
+      "isPE": true
+    }
+  ],
+  "clients": [
+    {
+      "id": "ClientA",
+      "rtNo": 110,
+      "routers": [
+        {
+          "id": "CEA-1",
+          "asn": 65002,
+          "telnetHost": "localhost:5004",
+          "interfaceId": "GigabitEthernet1/0",
+          "interfaceIp": {
+            "ip": 167772162,
+            "mask": -4
+          }
+        },
+        {
+          "id": "CEA-2",
+          "asn": 65004,
+          "telnetHost": "localhost:5005",
+          "interfaceId": "GigabitEthernet1/0",
+          "interfaceIp": {
+            "ip": 167772182,
+            "mask": -4
+          }
+        },
+        {
+          "id": "CEA-3",
+          "asn": 65004,
+          "telnetHost": "localhost:5008",
+          "interfaceId": "GigabitEthernet1/0",
+          "interfaceIp": {
+            "ip": 167772190,
+            "mask": -4
+          }
+        }
+      ]
+    },
+    {
+      "id": "ClientB",
+      "rtNo": 120,
+      "routers": [
+        {
+          "id": "CEB-1",
+          "asn": 65001,
+          "telnetHost": "localhost:5006",
+          "interfaceId": "GigabitEthernet3/0",
+          "interfaceIp": {
+            "ip": 167772166,
+            "mask": -4
+          }
+        },
+        {
+          "id": "CEB-2",
+          "asn": 65003,
+          "telnetHost": "localhost:5007",
+          "interfaceId": "GigabitEthernet3/0",
+          "interfaceIp": {
+            "ip": 167772186,
+            "mask": -4
+          }
+        }
+      ]
+    }
+  ]
+}

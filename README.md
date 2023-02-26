@@ -1,18 +1,26 @@
+```
+             _                        _
+  __ _ _   _| |_ ___  _ __ ___  _   _| |_ ___
+ / _` | | | | __/ _ \| '__/ _ \| | | | __/ _ \
+| (_| | |_| | || (_) | | | (_) | |_| | ||  __/
+ \__,_|\__,_|\__\___/|_|  \___/ \__,_|\__\___|
+```
+
 # MPLS VPN Auto Configuration
 
 This project auto-configures the routers used in a MPLS VPN network.
 
-# Run
+# Build and install
 
-`npm install`
-
-`npm start`
+`npm i`
+`npm run build`
+`sudo npm i -g .`
 
 # Config file example
 
 ```json
 {
-  "ASN": 65000,
+  "asn": 65000,
   "pCIDR": "10.0.0.0/16",
   "loCIDR": "10.10.10.10/16",
   "providerRouters": [
@@ -34,7 +42,7 @@ This project auto-configures the routers used in a MPLS VPN network.
       "routers": [
         {
           "id": "CEA-1",
-          "ASN": 65002,
+          "asn": 65002,
           "telnetHost": "localhost:5004",
           "interfaceId": "GigabitEthernet1/0"
         }

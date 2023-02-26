@@ -1,11 +1,14 @@
 {
-  "name": "gns3-config-generator",
+  "name": "autoroute",
   "version": "1.0.0",
-  "description": "A simple tool to generate GNS3 config files",
-  "main": "index.js",
+  "description": "Automatically configure CISCO routers for a MPLS VPN service",
+  "main": "build/index.js",
   "scripts": {
-    "start": "npm run build && node build/index.js",
-    "build": "tsc"
+    "build": "tsc",
+    "dev": "npm run build && node build/index.js"
+  },
+  "bin": {
+    "autoroute": "./build/index.js"
   },
   "repository": {
     "type": "git",
@@ -22,6 +25,7 @@
     "typescript": "^4.9.4"
   },
   "dependencies": {
+    "commander": "^10.0.0",
     "telnet-stream": "^1.1.0"
   }
 }
