@@ -66,4 +66,8 @@ export class IpGen {
     }
     this.ip = newIp
   }
+
+  compare(other: IpGen) {
+    return this.ip - other.ip
+  }
 }

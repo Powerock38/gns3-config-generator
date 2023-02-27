@@ -123,11 +123,16 @@ async function detectNewCEsAndConfigure(
   configJson: ConfigJson,
   configGenerated: Config
 ) {
-  const lastClient = configGenerated.clients[configGenerated.clients.length - 1]
-  const lastClientLastRouter = lastClient.routers[lastClient.routers.length - 1]
-  const highestRd = lastClientLastRouter.rd
-  const highestIpGen = lastClientLastRouter.interfaceIp
-  highestIpGen.incrementSelf(4)
+  let highestRd = Math.max(
+    ...configGenerated.clients.flatMap((c) => c.routers.map((r) => r.rd))
+  )
+  const highestIpGen = [
+    ...configGenerated.pRouters.flatMap((p) => p.interfaces.map((i) => i.ip)),
+    ...configGenerated.clients.flatMap((c) =>
+      c.routers.map((r) => r.interfaceIp)
+    ),
+  ].reduce((a, b) => (a.compare(b) > 0 ? a : b))
+  highestIpGen.incrementSelf(1)
 
   // detect added CE in config that are not in configGenerated
   const newCEs: {
@@ -194,9 +199,11 @@ async function detectNewCEsAndConfigure(
       asn: ceJson.asn,
       interfaceId: ceJson.interfaceId,
       telnetHost: ceJson.telnetHost,
-      rd: highestRd + 1,
+      rd: highestRd++,
       interfaceIp: highestIpGen.getNext(30),
     }
+
+    highestIpGen.incrementSelf(4)
 
     // update configGenerated
     pe.interfaces.push(peIface)
