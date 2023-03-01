@@ -6,8 +6,6 @@
  \__,_|\__,_|\__\___/|_|  \___/ \__,_|\__\___|
 ```
 
-# MPLS VPN Auto Configuration
-
 This project auto-configures the routers used in a MPLS VPN network.
 
 # Build and install
@@ -38,7 +36,7 @@ This project auto-configures the routers used in a MPLS VPN network.
   "clients": [
     {
       "id": "ClientA",
-      "rtNo": 110,
+      "friends": [],
       "routers": [
         {
           "id": "CEA-1",
@@ -52,7 +50,32 @@ This project auto-configures the routers used in a MPLS VPN network.
 }
 ```
 
-# How does it proceed?
+# Usage & features
+
+## Config file
+
+When running the script, you need to provide the path of a config file.
+
+A generated config file will be created in the same directory as the config file you provided, with the same name, but with the `.json` extension replaced with `.generated.json`.
+
+This file will be used to keep the state of the network, and will be used when adding new CEs to the network.
+
+## Adding a new CE
+
+Currently, adding CEs to existing clients is the only network mutation supported.
+
+To add a new CE to an existing client, you need to add to the config file:
+
+- add the new router to the `routers` array of the client
+- add a new interface to an existing PE router, with the `neighbor` field set to the new CE's id
+
+You can add as many CEs as you want at once.
+
+## Friends
+
+The `friends` field in the client config is used to specify which clients are friends of the current client. This means that the routers of the current client will be able to reach the routers of the friends, but not the other way around. You specify the friends by adding their client ids to the `friends` array.
+
+# How does it work?
 
 ## Parsing the config
 
@@ -68,6 +91,8 @@ This project auto-configures the routers used in a MPLS VPN network.
 - configure the loopback interface
 - if PE:
   - vrf definition for each CE
+    - import and export route target of this client
+    - also import route target of friend clients
 - for each interface:
   - configure the interface IP address
   - if PE-CE link:

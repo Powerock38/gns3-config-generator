@@ -18,6 +18,10 @@
         {
           "id": "GigabitEthernet1/0",
           "neighbor": "Pauillac"
+        },
+        {
+          "id": "GigabitEthernet4/0",
+          "neighbor": "CEB-3"
         }
       ]
     },
@@ -68,6 +72,10 @@
         {
           "id": "GigabitEthernet4/0",
           "neighbor": "CEA-3"
+        },
+        {
+          "id": "GigabitEthernet5/0",
+          "neighbor": "CEB-4"
         }
       ]
     }
@@ -112,6 +120,18 @@
           "asn": 65003,
           "telnetHost": "localhost:5007",
           "interfaceId": "GigabitEthernet3/0"
+        },
+        {
+          "id": "CEB-3",
+          "asn": 65005,
+          "telnetHost": "localhost:5009",
+          "interfaceId": "GigabitEthernet1/0"
+        },
+        {
+          "id": "CEB-4",
+          "asn": 65007,
+          "telnetHost": "localhost:5010",
+          "interfaceId": "GigabitEthernet1/0"
         }
       ]
     }

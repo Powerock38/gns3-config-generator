@@ -22,8 +22,8 @@ function userConfigIntoGeneratedConfig(configJson: any): Config {
   const clients: Client[] = []
   const pRouters: PRouter[] = []
 
-  const loIP = IpGen.fromCIDR(configJson.loCIDR)
-  const pIP = IpGen.fromCIDR(configJson.pCIDR)
+  const loIPPool = IpGen.fromCIDR(configJson.loCIDR)
+  const pIPPool = IpGen.fromCIDR(configJson.pCIDR)
 
   for (const pRouter of configJson.pRouters) {
     const interfaces: PInterface[] = []
@@ -45,8 +45,8 @@ function userConfigIntoGeneratedConfig(configJson: any): Config {
       if (neighborIface) {
         ip = neighborIface.ip.getNext(30)
       } else {
-        ip = pIP.getNext(30)
-        pIP.incrementSelf(4)
+        ip = pIPPool.getNext(30)
+        pIPPool.incrementSelf(4)
       }
 
       interfaces.push({
@@ -60,11 +60,11 @@ function userConfigIntoGeneratedConfig(configJson: any): Config {
       id: pRouter.id,
       telnetHost: pRouter.telnetHost,
       interfaces,
-      ipLo: loIP.getNext(32),
+      ipLo: loIPPool.getNext(32),
       isPE: false, // correctly set in next loop
     })
 
-    loIP.incrementSelf(1)
+    loIPPool.incrementSelf(1)
   }
 
   // index in array = rtGroup
@@ -116,23 +116,17 @@ function userConfigIntoGeneratedConfig(configJson: any): Config {
     })
   }
 
-  return { asn: configJson.asn, pRouters, clients }
+  return { asn: configJson.asn, pIPPool, loIPPool, pRouters, clients }
 }
 
 async function detectNewCEsAndConfigure(
   configJson: ConfigJson,
   configGenerated: Config
 ) {
-  let highestRd = Math.max(
-    ...configGenerated.clients.flatMap((c) => c.routers.map((r) => r.rd))
-  )
-  const highestIpGen = [
-    ...configGenerated.pRouters.flatMap((p) => p.interfaces.map((i) => i.ip)),
-    ...configGenerated.clients.flatMap((c) =>
-      c.routers.map((r) => r.interfaceIp)
-    ),
-  ].reduce((a, b) => (a.compare(b) > 0 ? a : b))
-  highestIpGen.incrementSelf(1)
+  let rd =
+    Math.max(
+      ...configGenerated.clients.flatMap((c) => c.routers.map((r) => r.rd))
+    ) + 1
 
   // detect added CE in config that are not in configGenerated
   const newCEs: {
@@ -191,7 +185,7 @@ async function detectNewCEsAndConfigure(
     const peIface: PInterface = {
       id: peIfaceJson.id,
       neighbor: peIfaceJson.neighbor,
-      ip: highestIpGen.getNext(30),
+      ip: configGenerated.pIPPool.getNext(30),
     }
 
     const ce: CERouter = {
@@ -199,11 +193,11 @@ async function detectNewCEsAndConfigure(
       asn: ceJson.asn,
       interfaceId: ceJson.interfaceId,
       telnetHost: ceJson.telnetHost,
-      rd: highestRd++,
-      interfaceIp: highestIpGen.getNext(30),
+      rd: rd++,
+      interfaceIp: peIface.ip.getNext(30),
     }
 
-    highestIpGen.incrementSelf(4)
+    configGenerated.pIPPool.incrementSelf(4)
 
     // update configGenerated
     pe.interfaces.push(peIface)

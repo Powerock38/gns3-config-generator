@@ -36,6 +36,8 @@ export type Client = {
 
 export type Config = {
   asn: number
+  pIPPool: IpGen
+  loIPPool: IpGen
   pRouters: PRouter[]
   clients: Client[]
 }
@@ -64,6 +66,8 @@ export type PRouterJson = {
 export type CERouterJson = {
   id: RouterId
   asn: number
+  pCIDR: string
+  loCIDR: string
   telnetHost: string
   interfaceId: InterfaceId
 }

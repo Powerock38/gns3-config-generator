@@ -114,6 +114,49 @@
           "interfaceId": "GigabitEthernet3/0"
         }
       ]
+    },
+    {
+      "id": "BanqueQG",
+      "friends": [
+        "BanqueAgence1",
+        "BanqueAgence2"
+      ],
+      "routers": [
+        {
+          "id": "CE-BanqueQG",
+          "asn": 65010,
+          "telnetHost": "localhost:5006",
+          "interfaceId": "GigabitEthernet3/0"
+        }
+      ]
+    },
+    {
+      "id": "BanqueAgence1",
+      "friends": [
+        "BanqueQG"
+      ],
+      "routers": [
+        {
+          "id": "CE-BanqueAgence1",
+          "asn": 65011,
+          "telnetHost": "localhost:5006",
+          "interfaceId": "GigabitEthernet3/0"
+        }
+      ]
+    },
+    {
+      "id": "BanqueAgence2",
+      "friends": [
+        "BanqueQG"
+      ],
+      "routers": [
+        {
+          "id": "CE-BanqueAgence2",
+          "asn": 65012,
+          "telnetHost": "localhost:5006",
+          "interfaceId": "GigabitEthernet3/0"
+        }
+      ]
     }
   ]
 }
