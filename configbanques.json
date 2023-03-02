@@ -9,11 +9,11 @@
       "interfaces": [
         {
           "id": "GigabitEthernet2/0",
-          "neighbor": "CEA-1"
+          "neighbor": "Banque1Agence"
         },
         {
           "id": "GigabitEthernet3/0",
-          "neighbor": "CEB-1"
+          "neighbor": "Banque2Agence"
         },
         {
           "id": "GigabitEthernet1/0",
@@ -58,60 +58,46 @@
           "neighbor": "Pomerol"
         },
         {
-          "id": "GigabitEthernet2/0",
-          "neighbor": "CEA-2"
-        },
-        {
-          "id": "GigabitEthernet3/0",
-          "neighbor": "CEB-2"
-        },
-        {
           "id": "GigabitEthernet4/0",
-          "neighbor": "CEA-3"
+          "neighbor": "BanqueQGBureau"
         }
       ]
     }
   ],
   "clients": [
     {
-      "id": "ClientA",
-      "friends": [],
+      "id": "Banque1",
+      "friends": ["BanqueQG"],
       "routers": [
         {
-          "id": "CEA-1",
-          "asn": 65002,
+          "id": "Banque1Agence",
+          "asn": 65011,
           "telnetHost": "localhost:5004",
-          "interfaceId": "GigabitEthernet1/0"
-        },
-        {
-          "id": "CEA-2",
-          "asn": 65004,
-          "telnetHost": "localhost:5005",
-          "interfaceId": "GigabitEthernet1/0"
-        },
-        {
-          "id": "CEA-3",
-          "asn": 65004,
-          "telnetHost": "localhost:5008",
           "interfaceId": "GigabitEthernet1/0"
         }
       ]
     },
     {
-      "id": "ClientB",
-      "friends": [],
+      "id": "Banque2",
+      "friends": ["BanqueQG"],
       "routers": [
         {
-          "id": "CEB-1",
-          "asn": 65001,
+          "id": "Banque2Agence",
+          "asn": 65012,
           "telnetHost": "localhost:5006",
           "interfaceId": "GigabitEthernet3/0"
-        },
+        }
+      ]
+    },
+    {
+      "id": "BanqueQG",
+      "friends": ["Banque1", "Banque2"],
+      "routers": [
         {
-          "id": "CEB-2",
-          "asn": 65003,
-          "telnetHost": "localhost:5007",
-          "interfaceId": "GigabitEthernet3/0"
+          "id": "BanqueQGBureau",
+          "asn": 65010,
+          "telnetHost": "localhost:5008",
+          "interfaceId": "GigabitEthernet1/0"
         }
       ]
     }
