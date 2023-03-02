@@ -3,9 +3,9 @@
 import { Command } from "commander"
 import fs from "fs"
 import path from "path"
-import { configure, configureCE } from "./configure"
+import { configure, configureCE, configureCEonPEinterface } from "./configure"
 import { IpGen } from "./IpGen"
-import { c, openTelnet } from "./telnet"
+import { openTelnet } from "./telnet"
 import {
   CERouter,
   CERouterJson,
@@ -205,31 +205,14 @@ async function detectNewCEsAndConfigure(
 
     console.log(`IP on PE will be ${peIface.ip.toStringWithMask()}`)
     console.log(`IP on CE will be ${ce.interfaceIp.toStringWithMask()}`)
+    console.log(`RD on CE will be ${ce.rd}`)
+    console.log()
 
+    // add on PE
     await openTelnet(pe.telnetHost)
+    await configureCEonPEinterface(client, ce, peIface, configJson.asn)
 
-    await c(`vrf definition ${ce.id}`)
-    await c(`rd ${configJson.asn}:${ce.rd}`)
-    await c(`route-target export ${configJson.asn}:${client.rtGroup}`)
-    await c(`route-target import ${configJson.asn}:${client.rtGroup}`)
-    for (const rtGroup of client.friendsRtGroup) {
-      await c(`route-target import ${configJson.asn}:${rtGroup}`)
-    }
-    await c(`address-family ipv4`)
-    await c(`exit-address-family`)
-
-    await c(`interface ${peIface.id}`)
-    await c(`description link to ${peIface.neighbor}`)
-    await c(`vrf forwarding ${peIface.neighbor}`)
-    await c(`ip address ${peIface.ip.toStringWithMask()}`)
-    await c(`no shutdown`)
-
-    await c(`router bgp ${configJson.asn}`)
-    await c(`address-family ipv4 vrf ${ce.id}`)
-    await c(`neighbor ${ce.interfaceIp} remote-as ${ce.asn}`)
-    await c(`neighbor ${ce.interfaceIp} activate`)
-    await c(`exit-address-family`)
-
+    // configure CE
     await configureCE(ce, pe.id, peIface.ip, configJson.asn)
   }
 }
@@ -271,15 +254,14 @@ program
       const configGenerated = configGeneratedJson as Config
       await detectNewCEsAndConfigure(configJson, configGenerated)
       fs.writeFileSync(genConfigPath, JSON.stringify(configGenerated))
-      console.log(`Re-wrote generated config in : ${genConfigPath}`)
+      console.log("\n", `Re-wrote generated config in : ${genConfigPath}`)
     } else {
       const config = userConfigIntoGeneratedConfig(configJson)
       await configure(config)
       fs.writeFileSync(genConfigPath, JSON.stringify(config))
-      console.log(`Wrote generated config in : ${genConfigPath}`)
+      console.log("\n", `Wrote generated config in : ${genConfigPath}`)
     }
 
-    console.log("\nDONE")
     process.exit()
   })
   .parse(process.argv)

@@ -1,6 +1,13 @@
 import { IpGen } from "./IpGen"
 import { c, openTelnet } from "./telnet"
-import { CERouter, Config, PRouter, RouterId } from "./types"
+import {
+  CERouter,
+  Client,
+  Config,
+  PInterface,
+  PRouter,
+  RouterId,
+} from "./types"
 
 export async function configure(config: Config) {
   // Configure P routers
@@ -16,60 +23,29 @@ export async function configure(config: Config) {
     await c(`ip address ${pRouter.ipLo.toStringWithMask()}`)
     await c(`ip ospf 1 area 0`)
 
-    // if PE, myClients contains all clients connected to this PE,
-    // with 'routers' field containing only the CE routers connected to this PE
-    const myClients = []
-    for (const client of config.clients) {
-      const ceRoutersNeighbors = []
-      for (const ceRouter of client.routers) {
-        for (const iface of pRouter.interfaces) {
-          if (iface.neighbor === ceRouter.id) {
-            ceRoutersNeighbors.push(ceRouter)
-          }
-        }
-      }
-      if (ceRoutersNeighbors.length) {
-        myClients.push({ ...client, routers: ceRoutersNeighbors })
-      }
-    }
-
-    for (const myClient of myClients) {
-      for (const ceRouter of myClient.routers) {
-        await c(`vrf definition ${ceRouter.id}`)
-        await c(`rd ${config.asn}:${ceRouter.rd}`)
-        await c(`route-target export ${config.asn}:${myClient.rtGroup}`)
-        await c(`route-target import ${config.asn}:${myClient.rtGroup}`)
-        for (const rtGroup of myClient.friendsRtGroup) {
-          await c(`route-target import ${config.asn}:${rtGroup}`)
-        }
-        await c(`address-family ipv4`)
-        await c(`exit-address-family`)
-      }
-    }
-
-    // regular interfaces
+    // interfaces
     for (const iface of pRouter.interfaces) {
-      await c(`interface ${iface.id}`)
-      await c(`description link to ${iface.neighbor}`)
-
-      // if PE
-      const isConnectedToCE = !!config.clients.find((client) =>
+      const client = config.clients.find((client) =>
         client.routers.find((ce) => ce.id === iface.neighbor)
       )
-      if (isConnectedToCE) {
-        await c(`vrf forwarding ${iface.neighbor}`)
+      const ceRouter = client?.routers.find((ce) => ce.id === iface.neighbor)
+
+      // if PE
+      if (client && ceRouter) {
+        await configureCEonPEinterface(client, ceRouter, iface, config.asn)
       } else {
         // if regular P router
+        await c(`interface ${iface.id}`)
+        await c(`description INTERNAL link to ${iface.neighbor}`)
         await c(`ip ospf 1 area 0`)
         await c(`negotiation auto`)
         await c(`mpls ip`)
+        await c(`ip address ${iface.ip.toStringWithMask()}`)
+        await c(`no shutdown`)
       }
-
-      await c(`ip address ${iface.ip.toStringWithMask()}`)
-      await c(`no shutdown`)
     }
 
-    // if PE
+    // if PE, connect BGP to other PEs
     if (pRouter.isPE) {
       await c(`router bgp ${config.asn}`)
       await c(`bgp log-neighbor-changes`)
@@ -85,15 +61,6 @@ export async function configure(config: Config) {
         await c(`neighbor ${peRouter.ipLo} activate`)
         await c(`neighbor ${peRouter.ipLo} send-community both`)
         await c(`exit-address-family`)
-      }
-
-      for (const myClient of myClients) {
-        for (const ceRouter of myClient.routers) {
-          await c(`address-family ipv4 vrf ${ceRouter.id}`)
-          await c(`neighbor ${ceRouter.interfaceIp} remote-as ${ceRouter.asn}`)
-          await c(`neighbor ${ceRouter.interfaceIp} activate`)
-          await c(`exit-address-family`)
-        }
       }
     }
   }
@@ -118,6 +85,38 @@ export async function configure(config: Config) {
       await configureCE(ceRouter, pe.id, peIface.ip, config.asn)
     }
   }
+}
+
+export async function configureCEonPEinterface(
+  client: Client,
+  ceRouter: CERouter,
+  peIface: PInterface,
+  asn: number
+) {
+  // VRF
+  await c(`vrf definition ${ceRouter.id}`)
+  await c(`rd ${asn}:${ceRouter.rd}`)
+  await c(`route-target export ${asn}:${client.rtGroup}`)
+  await c(`route-target import ${asn}:${client.rtGroup}`)
+  for (const rtGroup of client.friendsRtGroup) {
+    await c(`route-target import ${asn}:${rtGroup}`)
+  }
+  await c(`address-family ipv4`)
+  await c(`exit-address-family`)
+
+  // interface
+  await c(`interface ${peIface.id}`)
+  await c(`description EXTERNAL link to ${peIface.neighbor}`)
+  await c(`vrf forwarding ${peIface.neighbor}`)
+  await c(`ip address ${peIface.ip.toStringWithMask()}`)
+  await c(`no shutdown`)
+
+  // BGP
+  await c(`router bgp ${asn}`)
+  await c(`address-family ipv4 vrf ${ceRouter.id}`)
+  await c(`neighbor ${ceRouter.interfaceIp} remote-as ${ceRouter.asn}`)
+  await c(`neighbor ${ceRouter.interfaceIp} activate`)
+  await c(`exit-address-family`)
 }
 
 export async function configureCE(
