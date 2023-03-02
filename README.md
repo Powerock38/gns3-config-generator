@@ -89,21 +89,20 @@ The `friends` field in the client config is used to specify which clients are fr
 
 - set the hostname, enable OSPF
 - configure the loopback interface
-- if PE:
-  - vrf definition for each CE
-    - import and export route target of this client
-    - also import route target of friend clients
+- if PE
+  - enable BGP
+  - add every other PE as neighbor
 - for each interface:
   - configure the interface IP address
-  - if PE-CE link:
-    - vrf forwarding for the CE
-  - else:
+  - if normal link:
     - enable OSPF (area 0)
     - enable MPLS
-- if PE
-  - enable BGP, add every other PE as neighbor
-  - for each client:
-    - for each CE connected to the PE:
+  - else if PE-CE link:
+    - vrf definition for the CE
+      - import and export route target of this client's CE
+      - also import route target of friends
+    - vrf forwarding for the CE
+    - BGP
       - address-family ipv4 vrf
       - configure the CE as neighbor
 

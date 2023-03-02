@@ -23,6 +23,25 @@ export async function configure(config: Config) {
     await c(`ip address ${pRouter.ipLo.toStringWithMask()}`)
     await c(`ip ospf 1 area 0`)
 
+    // if PE, connect BGP to other PEs
+    if (pRouter.isPE) {
+      await c(`router bgp ${config.asn}`)
+      await c(`bgp log-neighbor-changes`)
+
+      // bgp neighbors are all other PEs
+      const peRouters = config.pRouters.filter(
+        (otherRouter) => otherRouter.isPE && otherRouter.id !== pRouter.id
+      )
+      for (const peRouter of peRouters as PRouter[]) {
+        await c(`neighbor ${peRouter.ipLo} remote-as ${config.asn}`)
+        await c(`neighbor ${peRouter.ipLo} update-source Loopback0`)
+        await c(`address-family vpnv4`)
+        await c(`neighbor ${peRouter.ipLo} activate`)
+        await c(`neighbor ${peRouter.ipLo} send-community both`)
+        await c(`exit-address-family`)
+      }
+    }
+
     // interfaces
     for (const iface of pRouter.interfaces) {
       const client = config.clients.find((client) =>
@@ -42,25 +61,6 @@ export async function configure(config: Config) {
         await c(`mpls ip`)
         await c(`ip address ${iface.ip.toStringWithMask()}`)
         await c(`no shutdown`)
-      }
-    }
-
-    // if PE, connect BGP to other PEs
-    if (pRouter.isPE) {
-      await c(`router bgp ${config.asn}`)
-      await c(`bgp log-neighbor-changes`)
-
-      // bgp neighbors are all other PEs
-      const peRouters = config.pRouters.filter(
-        (otherRouter) => otherRouter.isPE && otherRouter.id !== pRouter.id
-      )
-      for (const peRouter of peRouters as PRouter[]) {
-        await c(`neighbor ${peRouter.ipLo} remote-as ${config.asn}`)
-        await c(`neighbor ${peRouter.ipLo} update-source Loopback0`)
-        await c(`address-family vpnv4`)
-        await c(`neighbor ${peRouter.ipLo} activate`)
-        await c(`neighbor ${peRouter.ipLo} send-community both`)
-        await c(`exit-address-family`)
       }
     }
   }
