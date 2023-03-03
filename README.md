@@ -62,6 +62,8 @@ This file will be used to keep the state of the network, and will be used when a
 
 ## Adding a new CE
 
+If you run the script pointing to a config file that already has a `generated.json` file next to it, the script will look for new CEs to add to the network.
+
 Currently, adding CEs to existing clients is the only network mutation supported.
 
 To add a new CE to an existing client, you need to add to the config file:
